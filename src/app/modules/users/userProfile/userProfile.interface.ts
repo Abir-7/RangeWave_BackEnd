@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { ILocation } from "../mechanicProfile/mechanicProfile.interface";
 
 export interface IUserProfile {
   fullName: string;
@@ -6,7 +7,7 @@ export interface IUserProfile {
   dateOfBirth?: Date;
   email: string;
   phone?: string;
-  address?: string;
+  location?: ILocation;
   image?: string;
   user: Types.ObjectId;
 }

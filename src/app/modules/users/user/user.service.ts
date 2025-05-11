@@ -1,4 +1,5 @@
-import { IUserProfile } from "./../userProfile/userProfile.interface";
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+
 import status from "http-status";
 import AppError from "../../../errors/AppError";
 import { getRelativePath } from "../../../middleware/fileUpload/getRelativeFilePath";
@@ -11,14 +12,23 @@ import { UserProfile } from "../userProfile/userProfile.model";
 import { IUser } from "./user.interface";
 import User from "./user.model";
 import { AdminProfile } from "../adminProfile/adminProfile.model";
-import { IAdminProfile } from "../adminProfile/adminProfile.interface";
-import { removeFalsyFields } from "../../../utils/helper/removeFalsyField";
 
-const createUser = async (data: {
-  email: string;
-  fullName: string;
-  password: string;
-}): Promise<Partial<IUser>> => {
+import { TUserRole } from "../../../interface/auth.interface";
+import { MechanicProfile } from "../mechanicProfile/mechanicProfile.model";
+import unlinkFile from "../../../utils/unlinkFiles";
+
+const createUser = async (
+  data: {
+    email: string;
+    fullName: string;
+    password: string;
+  },
+  role: TUserRole
+): Promise<Partial<IUser>> => {
+  if (!role) {
+    throw new AppError(status.BAD_REQUEST, "User role in required.");
+  }
+
   const hashedPassword = await getHashedPassword(data.password);
   const otp = getOtp(4);
   const expDate = getExpiryTime(10);
@@ -29,7 +39,7 @@ const createUser = async (data: {
     password: hashedPassword,
     authentication: { otp, expDate },
   };
-  const createdUser = await User.create(userData);
+  const createdUser = await User.create({ ...userData, role });
 
   //user profile data
   const userProfileData = {
@@ -37,7 +47,12 @@ const createUser = async (data: {
     email: createdUser.email,
     user: createdUser._id,
   };
-  await UserProfile.create(userProfileData);
+  if (role === "USER") {
+    await UserProfile.create(userProfileData);
+  }
+  if (role === "MECHANIC") {
+    await MechanicProfile.create(userProfileData);
+  }
   await sendEmail(
     data.email,
     "Email Verification Code",
@@ -51,58 +66,52 @@ const updateProfileImage = async (path: string, email: string) => {
 
   const user = await User.findOne({ email: email });
 
-  let updated;
+  let profile;
 
   if (user?.role === "USER") {
-    updated = await UserProfile.findOneAndUpdate(
-      { email: email },
-      { image },
-      { new: true }
-    );
+    profile = await UserProfile.findById(user._id);
+    if (profile?.image) {
+      unlinkFile(profile.image as string);
+    }
+
+    if (profile) {
+      profile.image = image;
+    }
   }
 
   if (user?.role === "ADMIN") {
-    updated = await AdminProfile.findOneAndUpdate(
-      { email: email },
-      { image },
-      { new: true }
-    );
+    profile = await AdminProfile.findById(user._id);
+    if (profile?.image) {
+      unlinkFile(profile.image as string);
+    }
+
+    if (profile) {
+      profile.image = image;
+    }
   }
 
-  if (!updated) {
+  if (user?.role === "MECHANIC") {
+    profile = await UserProfile.findById(user._id);
+    if (profile?.image) {
+      unlinkFile(profile.image as string);
+    }
+
+    if (profile) {
+      profile.image = image;
+    }
+  }
+
+  await profile?.save();
+
+  if (!profile) {
+    unlinkFile(image as string);
     throw new AppError(status.BAD_REQUEST, "Failed to update image.");
   }
 
-  return updated;
-};
-
-const updateProfileData = async (
-  userdata: Partial<IAdminProfile> | Partial<IUserProfile>,
-  email: string
-): Promise<IAdminProfile | IUserProfile | null> => {
-  const data = removeFalsyFields(userdata);
-  const user = await User.findOne({ email: email });
-  let updated;
-
-  if (user?.role === "ADMIN") {
-    updated = await AdminProfile.findOneAndUpdate({ email: email }, data, {
-      new: true,
-    });
-  }
-  if (user?.role === "USER") {
-    updated = await UserProfile.findOneAndUpdate({ email: email }, data, {
-      new: true,
-    });
-  }
-  if (!updated) {
-    throw new AppError(status.BAD_REQUEST, "Failed to update user info.");
-  }
-
-  return updated;
+  return profile;
 };
 
 export const UserService = {
   createUser,
   updateProfileImage,
-  updateProfileData,
 };

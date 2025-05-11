@@ -8,6 +8,7 @@ export interface IAuthData {
 export const userRoles = {
   ADMIN: "ADMIN",
   USER: "USER",
+  MECHANIC: "MECHANIC",
 } as const;
 
 export const userRole = Object.values(userRoles);

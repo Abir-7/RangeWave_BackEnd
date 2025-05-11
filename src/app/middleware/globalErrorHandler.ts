@@ -10,6 +10,7 @@ import { handleZodError } from "../errors/zodErrorHandler";
 import { ZodError } from "zod";
 import multer from "multer";
 import multerErrorHandler from "../errors/MulterErrorHandler";
+import logger from "../utils/logger";
 
 export const globalErrorHandler = async (
   err: any,
@@ -82,7 +83,6 @@ export const globalErrorHandler = async (
       },
     ];
   } else if (err instanceof Error) {
-    console.log("object");
     message = err.message;
     errors = [
       {
@@ -92,6 +92,7 @@ export const globalErrorHandler = async (
     ];
   }
 
+  logger.error(err);
   res.status(statusCode).json({
     success: false,
     status: statusCode,

@@ -16,15 +16,9 @@ router.post(
 
 router.patch(
   "/update-profile-image",
-  auth("ADMIN", "USER"),
+  auth("ADMIN", "USER", "MECHANIC"),
   upload.single("file"),
   UserController.updateProfileImage
-);
-
-router.patch(
-  "/update-profile-data",
-  auth("ADMIN", "USER"),
-  UserController.updateProfileData
 );
 
 export const UserRoute = router;

@@ -5,7 +5,6 @@ import User from "../users/user/user.model";
 
 import { jsonWebToken } from "../../utils/jwt/jwt";
 
-import { UserProfile } from "../users/userProfile/userProfile.model";
 import getExpiryTime from "../../utils/helper/getExpiryTime";
 import getOtp from "../../utils/helper/getOtp";
 import { sendEmail } from "../../utils/sendEmail";
@@ -74,25 +73,26 @@ const verifyUser = async (
   if (!otp) {
     throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
   }
-  const user = (await UserProfile.findOne({ email }).populate("user")) as any;
+  const user = await User.findOne({ email });
+
   if (!user) {
     throw new AppError(status.BAD_REQUEST, "User not found");
   }
 
   const currentDate = new Date();
-  const expirationDate = new Date(user.user.authentication.expDate);
+  const expirationDate = new Date(user.authentication.expDate);
 
   if (currentDate > expirationDate) {
     throw new AppError(status.BAD_REQUEST, "Code time expired.");
   }
 
-  if (otp !== user.user.authentication.otp) {
+  if (otp !== user.authentication.otp) {
     throw new AppError(status.BAD_REQUEST, "Code not matched.");
   }
 
   let updatedUser;
   let token = null;
-  if (user.user.isVerified) {
+  if (user.isVerified) {
     token = jsonWebToken.generateToken(
       { userEmail: user.email },
       appConfig.jwt.jwt_access_secret as string,
@@ -211,7 +211,8 @@ const resetPassword = async (
     { email: decode.userEmail },
     {
       password: hassedPassword,
-      authentication: { otp: null, token: null, expDate: null },   needToResetPass: false,
+      authentication: { otp: null, token: null, expDate: null },
+      needToResetPass: false,
     },
     { new: true }
   );
@@ -325,5 +326,6 @@ export const AuthService = {
   forgotPasswordRequest,
   resetPassword,
   getNewAccessToken,
-  updatePassword,  reSendOtp,
+  updatePassword,
+  reSendOtp,
 };

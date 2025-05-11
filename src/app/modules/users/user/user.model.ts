@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 const userSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false },
-  role: { type: String, enum: userRole, default: "USER" },
+  role: { type: String, enum: userRole, required: true },
   authentication: {
     expDate: { type: Date, default: null },
     otp: { type: Number, default: null },
@@ -16,6 +16,7 @@ const userSchema = new Schema<IUser>({
   },
   isVerified: { type: Boolean, default: false },
   needToResetPass: { type: Boolean, default: false },
+  needToUpdateProfile: { type: Boolean, default: true },
 });
 
 userSchema.methods.comparePassword = async function (enteredPassword: string) {

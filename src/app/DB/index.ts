@@ -12,6 +12,7 @@ const superUser = {
   email: appConfig.admin.email,
   password: appConfig.admin.password,
   isVerified: true,
+  needToUpdateProfile: false,
 };
 
 const superUserProfile = {
