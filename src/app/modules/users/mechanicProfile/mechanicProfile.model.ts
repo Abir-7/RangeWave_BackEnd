@@ -54,66 +54,71 @@ const CertificateSchema = new Schema<ICertificate>(
 );
 
 // MechanicProfile Schema
-const MechanicProfileSchema = new Schema<IMechanicProfile>({
-  fullName: {
-    type: String,
-  },
-  email: {
-    type: String,
-  },
-  workshopName: {
-    type: String,
-  },
-  location: {
-    apartmentNo: {
+const MechanicProfileSchema = new Schema<IMechanicProfile>(
+  {
+    fullName: {
       type: String,
     },
-    roadNo: {
+    email: {
       type: String,
     },
-    state: {
+    workshopName: {
       type: String,
     },
-    city: {
-      type: String,
-    },
-    zipCode: {
-      type: String,
-    },
-    address: {
-      type: String,
-    },
-    coordinates: {
-      type: [Number],
-      default: [],
-      validate: {
-        validator: function (v: [number, number]) {
-          return v.length === 2 && !isNaN(v[0]) && !isNaN(v[1]);
+    location: {
+      apartmentNo: {
+        type: String,
+      },
+      roadNo: {
+        type: String,
+      },
+      state: {
+        type: String,
+      },
+      city: {
+        type: String,
+      },
+      zipCode: {
+        type: String,
+      },
+      address: {
+        type: String,
+      },
+      coordinates: {
+        type: [Number],
+        default: [],
+        validate: {
+          validator: function (v: [number, number]) {
+            return v.length === 2 && !isNaN(v[0]) && !isNaN(v[1]);
+          },
+          message:
+            "Coordinates should be an array of two numbers [longitude, latitude]",
         },
-        message:
-          "Coordinates should be an array of two numbers [longitude, latitude]",
       },
     },
+    phoneNumber: {
+      type: String,
+    },
+    workingHours: {
+      type: WorkingHourSchema,
+    },
+    services: {
+      type: [String],
+      default: [], // array of strings
+    },
+    experience: {
+      type: [ExperienceSchema],
+      default: [], // array of experiences
+    },
+    certificates: {
+      type: [CertificateSchema],
+      default: [], // array of certificates
+    },
+    image: { type: String },
+    user: { type: Schema.Types.ObjectId, required: true, ref: "User" },
   },
-  phoneNumber: {
-    type: String,
-  },
-  workingHours: {
-    type: WorkingHourSchema,
-  },
-  services: {
-    type: [String],
-    default: [], // array of strings
-  },
-  experience: {
-    type: [ExperienceSchema],
-    default: [], // array of experiences
-  },
-  certificates: {
-    type: [CertificateSchema],
-    default: [], // array of certificates
-  },
-});
+  { timestamps: true }
+);
 
 // Create and export the model
 export const MechanicProfile = model("MechanicProfile", MechanicProfileSchema);

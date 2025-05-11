@@ -1,6 +1,34 @@
 import { Schema, model } from "mongoose";
 import { IUserProfile } from "./userProfile.interface";
 
+const carInfoSchema = new Schema(
+  {
+    carName: {
+      type: String,
+      required: true,
+    },
+    carModel: {
+      type: String,
+      required: true,
+    },
+    vinCode: {
+      type: String,
+      required: true,
+    },
+    licensePlate: {
+      type: String,
+      required: true,
+    },
+    tagNumber: {
+      type: String,
+      required: true,
+    },
+  },
+  {
+    _id: false, // No separate _id for this sub-document
+  }
+);
+
 const userProfileSchema = new Schema<IUserProfile>({
   fullName: { type: String },
   nickname: { type: String },
@@ -40,6 +68,7 @@ const userProfileSchema = new Schema<IUserProfile>({
   },
   image: { type: String },
   user: { type: Schema.Types.ObjectId, ref: "User", unique: true },
+  carInfo: carInfoSchema,
 });
 
 export const UserProfile = model<IUserProfile>(

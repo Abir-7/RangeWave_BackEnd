@@ -1,1 +1,1 @@
-export const UserProfileController = {};
+export const AdminProfileController = {};

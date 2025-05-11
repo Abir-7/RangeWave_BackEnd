@@ -1,3 +1,5 @@
+import { Types } from "mongoose";
+
 export interface IWorkingHour {
   start: string; // e.g., "10:00"
   end: string; // e.g., "15:00"
@@ -34,4 +36,6 @@ export interface IMechanicProfile {
   services: string[];
   experience: IExperience[];
   certificates: ICertificate[];
+  image: string;
+  user: Types.ObjectId;
 }

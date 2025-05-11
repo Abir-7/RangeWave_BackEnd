@@ -1,1 +1,1 @@
-export const UserProfileService = {};
+export const AdminProfileService = {};

@@ -69,7 +69,7 @@ const updateProfileImage = async (path: string, email: string) => {
   let profile;
 
   if (user?.role === "USER") {
-    profile = await UserProfile.findById(user._id);
+    profile = await UserProfile.findOne({ user: user._id });
     if (profile?.image) {
       unlinkFile(profile.image as string);
     }
@@ -80,7 +80,7 @@ const updateProfileImage = async (path: string, email: string) => {
   }
 
   if (user?.role === "ADMIN") {
-    profile = await AdminProfile.findById(user._id);
+    profile = await AdminProfile.findOne({ user: user._id });
     if (profile?.image) {
       unlinkFile(profile.image as string);
     }
@@ -91,7 +91,8 @@ const updateProfileImage = async (path: string, email: string) => {
   }
 
   if (user?.role === "MECHANIC") {
-    profile = await UserProfile.findById(user._id);
+    profile = await MechanicProfile.findOne({ user: user._id });
+
     if (profile?.image) {
       unlinkFile(profile.image as string);
     }

@@ -17,7 +17,7 @@ router.post(
 router.patch(
   "/update-profile-image",
   auth("ADMIN", "USER", "MECHANIC"),
-  upload.single("file"),
+  upload.single("image"),
   UserController.updateProfileImage
 );
 

@@ -10,4 +10,11 @@ export interface IUserProfile {
   location?: ILocation;
   image?: string;
   user: Types.ObjectId;
+  carInfo: {
+    carName: string;
+    carModel: string;
+    vinCode: string;
+    licensePlate: string;
+    tagNumber: string;
+  };
 }
