@@ -1,0 +1,80 @@
+import status from "http-status";
+import AppError from "../../../errors/AppError";
+import Service from "../service/service.model";
+import { BidStatus, IBid } from "./bid.interface";
+import Bid from "./bid.model";
+import { Status } from "../service/service.interface";
+
+const addBid = async (
+  bidData: { price: number; reqServiceId: string },
+  userId: string
+): Promise<IBid> => {
+  const isServiceExist = await Service.findOne({
+    _id: bidData.reqServiceId,
+    status: Status.FINDING,
+  });
+
+  if (!isServiceExist) {
+    throw new AppError(status.NOT_FOUND, "Service req not found");
+  }
+
+  const findBid = await Bid.findOne({
+    mechanicId: userId,
+    reqServiceId: bidData.reqServiceId,
+  });
+
+  if (findBid?.status === BidStatus.declined) {
+    throw new AppError(status.BAD_REQUEST, "You already declined.");
+  }
+
+  if (findBid?.status === BidStatus.provided) {
+    throw new AppError(status.BAD_REQUEST, "You already add bid.");
+  }
+
+  const service = await Bid.create({
+    ...bidData,
+    mechanicId: userId,
+    status: BidStatus.provided,
+  });
+  return service;
+};
+
+const declinedBid = async (
+  bidData: { reqServiceId: string },
+  userId: string
+): Promise<IBid> => {
+  const isServiceExist = await Service.findOne({
+    _id: bidData.reqServiceId,
+    status: Status.FINDING,
+  });
+
+  if (!isServiceExist) {
+    throw new AppError(status.NOT_FOUND, "Service req not found");
+  }
+
+  const findBid = await Bid.findOne({
+    mechanicId: userId,
+    reqServiceId: bidData.reqServiceId,
+  });
+
+  if (findBid?.status === BidStatus.declined) {
+    throw new AppError(status.BAD_REQUEST, "You already declined.");
+  }
+
+  if (findBid?.status === BidStatus.provided) {
+    throw new AppError(status.BAD_REQUEST, "You already add bid.");
+  }
+
+  const service = await Bid.create({
+    ...bidData,
+    price: 0,
+    mechanicId: userId,
+    status: BidStatus.declined,
+  });
+  return service;
+};
+
+export const BidService = {
+  addBid,
+  declinedBid,
+};
