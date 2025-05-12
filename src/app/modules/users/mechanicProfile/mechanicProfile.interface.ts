@@ -23,6 +23,7 @@ export interface ILocation {
   city: string;
   zipCode: string;
   address: string;
+  country: string;
   coordinates: number[]; // [longitude, latitude]
 }
 

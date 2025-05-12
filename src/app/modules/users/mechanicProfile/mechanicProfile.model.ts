@@ -66,6 +66,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
       type: String,
     },
     location: {
+      country: { type: String },
       apartmentNo: {
         type: String,
       },

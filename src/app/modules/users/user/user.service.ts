@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 
 import status from "http-status";
@@ -17,6 +18,8 @@ import { TUserRole } from "../../../interface/auth.interface";
 import { MechanicProfile } from "../mechanicProfile/mechanicProfile.model";
 import unlinkFile from "../../../utils/unlinkFiles";
 
+import { startSession } from "mongoose";
+
 const createUser = async (
   data: {
     email: string;
@@ -26,39 +29,65 @@ const createUser = async (
   role: TUserRole
 ): Promise<Partial<IUser>> => {
   if (!role) {
-    throw new AppError(status.BAD_REQUEST, "User role in required.");
+    throw new AppError(status.BAD_REQUEST, "User role is required.");
   }
 
-  const hashedPassword = await getHashedPassword(data.password);
-  const otp = getOtp(4);
-  const expDate = getExpiryTime(10);
+  const session = await startSession(); // Start a session for the transaction
+  session.startTransaction(); // Begin the transaction
 
-  //user data
-  const userData = {
-    email: data.email,
-    password: hashedPassword,
-    authentication: { otp, expDate },
-  };
-  const createdUser = await User.create({ ...userData, role });
+  try {
+    const hashedPassword = await getHashedPassword(data.password);
+    const otp = getOtp(4);
+    const expDate = getExpiryTime(10);
 
-  //user profile data
-  const userProfileData = {
-    fullName: data.fullName,
-    email: createdUser.email,
-    user: createdUser._id,
-  };
-  if (role === "USER") {
-    await UserProfile.create(userProfileData);
+    // User data
+    const userData = {
+      email: data.email,
+      password: hashedPassword,
+      authentication: { otp, expDate },
+    };
+
+    // Create user
+    const createdUser = await User.create([{ ...userData, role }], { session });
+
+    // User profile data
+    const userProfileData = {
+      fullName: data.fullName,
+      email: createdUser[0].email,
+      user: createdUser[0]._id,
+    };
+
+    // Create profile based on the role
+    if (role === "USER") {
+      await UserProfile.create([userProfileData], { session });
+    }
+    if (role === "MECHANIC") {
+      await MechanicProfile.create([userProfileData], { session });
+    }
+
+    // Send email verification
+    await sendEmail(
+      data.email,
+      "Email Verification Code",
+      `Your code is: ${otp}`
+    );
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession(); // End the session
+
+    return {
+      email: createdUser[0].email,
+      isVerified: createdUser[0].isVerified,
+    };
+  } catch (error) {
+    // If any error occurs, abort the transaction
+    await session.abortTransaction();
+    session.endSession(); // End the session
+
+    // Rethrow the error so the caller can handle it
+    throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to create user.");
   }
-  if (role === "MECHANIC") {
-    await MechanicProfile.create(userProfileData);
-  }
-  await sendEmail(
-    data.email,
-    "Email Verification Code",
-    `Your code is: ${otp}`
-  );
-  return { email: createdUser.email, isVerified: createdUser.isVerified };
 };
 
 const updateProfileImage = async (path: string, email: string) => {

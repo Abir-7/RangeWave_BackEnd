@@ -5,23 +5,18 @@ const carInfoSchema = new Schema(
   {
     carName: {
       type: String,
-      required: true,
     },
     carModel: {
       type: String,
-      required: true,
     },
     vinCode: {
       type: String,
-      required: true,
     },
     licensePlate: {
       type: String,
-      required: true,
     },
     tagNumber: {
       type: String,
-      required: true,
     },
   },
   {
@@ -36,6 +31,7 @@ const userProfileSchema = new Schema<IUserProfile>({
   email: { type: String, unique: true },
   phone: { type: String },
   location: {
+    country: { type: String },
     apartmentNo: {
       type: String,
     },
@@ -56,15 +52,8 @@ const userProfileSchema = new Schema<IUserProfile>({
     },
     coordinates: {
       type: [Number],
-      default: [],
-      validate: {
-        validator: function (v: [number, number]) {
-          return v.length === 2 && !isNaN(v[0]) && !isNaN(v[1]);
-        },
-        message:
-          "Coordinates should be an array of two numbers [longitude, latitude]",
-      },
     },
+    default: {},
   },
   image: { type: String },
   user: { type: Schema.Types.ObjectId, ref: "User", unique: true },

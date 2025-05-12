@@ -5,9 +5,9 @@ import { UserProfileController } from "./userProfile.controller";
 const router = Router();
 
 router.patch(
-  "/update-mechanic-profile",
-  auth("MECHANIC"),
+  "/update-user-profile",
+  auth("USER"),
   UserProfileController.updateUserProfile
 );
 
-export const MechanicProfileRoute = router;
+export const UserProfileRoute = router;

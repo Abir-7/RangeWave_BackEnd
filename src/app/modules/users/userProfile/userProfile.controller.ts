@@ -13,7 +13,7 @@ const updateUserProfile = catchAsync(async (req, res) => {
   sendResponse(res, {
     success: true,
     statusCode: status.OK,
-    message: " Mechanic Profile info updated successfully.",
+    message: " User Profile info updated successfully.",
     data: result,
   });
 });
