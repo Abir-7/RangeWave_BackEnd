@@ -1,5 +1,7 @@
 import Service from "./service.model";
-import { IService } from "./service.interface";
+import { IService, Status } from "./service.interface";
+import Bid from "../bid/bid.model";
+import { IBid } from "../bid/bid.interface";
 
 const createService = async (
   serviceData: Partial<IService>,
@@ -9,12 +11,64 @@ const createService = async (
   return service;
 };
 
-const getServiceById = async (id: string): Promise<IService> => {
-  const service = await Service.findById(id);
+const getBidListOfService = async (
+  id: string,
+  userId: string
+): Promise<IBid[]> => {
+  const service = await Service.findOne({
+    _id: id,
+    status: Status.FINDING,
+    user: userId,
+  });
   if (!service) {
     throw new Error("Service not found");
   }
-  return service;
+
+  const bidList = await Bid.aggregate([
+    {
+      $match: {
+        reqServiceId: service._id,
+      },
+    },
+    {
+      $lookup: {
+        from: "users", // Assuming "users" is the collection for mechanics
+        localField: "mechanicId",
+        foreignField: "_id",
+        as: "mechanic",
+      },
+    },
+    {
+      $unwind: "$mechanic",
+    },
+    {
+      $lookup: {
+        from: "mechanicratings", // Assuming "mechanicratings" is the collection for ratings
+        localField: "mechanicId",
+        foreignField: "mechanicId",
+        as: "ratings",
+      },
+    },
+    {
+      $addFields: {
+        avgRating: {
+          $cond: {
+            if: { $eq: [{ $size: "$ratings" }, 0] },
+            then: null, // No ratings available
+            else: { $avg: "$ratings.rating" }, // Calculate average rating
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        mechanic: 1,
+        reqServiceId: 1,
+        avgRating: 1,
+      },
+    },
+  ]);
+  return bidList;
 };
 
 const cancelService = async (
@@ -32,6 +86,6 @@ const cancelService = async (
 
 export const ServiceService = {
   createService,
-  getServiceById,
+  getBidListOfService,
   cancelService,
 };

@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 
-import { ServiceService } from "../service.service";
 import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
+import { ServiceService } from "./service.service";
 
 const createService = catchAsync(async (req: Request, res: Response) => {
   const serviceData = req.body;
@@ -18,13 +18,13 @@ const createService = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getService = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await ServiceService.getServiceById(id);
+const getBidListOfService = catchAsync(async (req: Request, res: Response) => {
+  const { sId } = req.params;
+  const result = await ServiceService.getBidListOfService(sId, req.user.userId);
   sendResponse(res, {
     success: true,
     statusCode: 200,
-    message: "Service retrieved successfully",
+    message: "Bid list of a Service retrieved successfully",
     data: result,
   });
 });
@@ -43,7 +43,7 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
 
 export const ServiceController = {
   createService,
+  getBidListOfService,
 
-  getService,
   cancelService,
 };

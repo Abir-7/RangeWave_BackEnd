@@ -9,12 +9,12 @@ const BidSchema = new Schema<IBid>(
     },
     reqServiceId: {
       type: Schema.Types.ObjectId,
-      ref: "ServiceRequest", // Assuming you have a ServiceRequest model
+      ref: "Service", // Assuming you have a ServiceRequest model
       required: true,
     },
     mechanicId: {
       type: Schema.Types.ObjectId,
-      ref: "Mechanic", // Assuming you have a Mechanic model
+      ref: "User", // Assuming you have a Mechanic model
       required: true,
     },
     status: {

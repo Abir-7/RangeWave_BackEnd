@@ -6,10 +6,17 @@ const router = Router();
 
 //for user only
 router.post("/req-for-help", auth("USER"), ServiceController.createService);
+
+router.get(
+  "/list-of-bid/:sId",
+  auth("USER"),
+  ServiceController.getBidListOfService
+);
+
 router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 
 //for mechanics
 
 //for both
-router.get("/:id", auth("MECHANIC", "USER"), ServiceController.getService);
+
 export const ServiceRoute = router;

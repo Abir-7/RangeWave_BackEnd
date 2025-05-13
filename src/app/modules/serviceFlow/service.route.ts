@@ -11,5 +11,5 @@ router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 //for mechanics
 
 //for both
-router.get("/:id", auth("MECHANIC", "USER"), ServiceController.getService);
+
 export const ServiceRoute = router;
