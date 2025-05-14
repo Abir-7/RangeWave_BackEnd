@@ -28,6 +28,16 @@ const getBidListOfService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const hireMechanic = catchAsync(async (req: Request, res: Response) => {
+  const { bidId } = req.body;
+  const result = await ServiceService.hireMechanic(bidId, req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "A mechanic is fired successfully",
+    data: result,
+  });
+});
 
 const cancelService = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -44,6 +54,6 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
 export const ServiceController = {
   createService,
   getBidListOfService,
-
+  hireMechanic,
   cancelService,
 };

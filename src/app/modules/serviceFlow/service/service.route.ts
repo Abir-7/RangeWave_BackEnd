@@ -13,6 +13,8 @@ router.get(
   ServiceController.getBidListOfService
 );
 
+router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
+
 router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 
 //for mechanics

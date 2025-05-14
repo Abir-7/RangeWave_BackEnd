@@ -67,7 +67,7 @@ const updateUserProfile = async (
             (locations as Record<string, string>)[field];
         }
 
-        if (coordinates && coordinates.length === 2) {
+        if (coordinates && coordinates.coordinates.length === 2) {
           profileData.location.coordinates = coordinates;
         }
       }

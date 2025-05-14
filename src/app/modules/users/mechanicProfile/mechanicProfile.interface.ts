@@ -24,7 +24,10 @@ export interface ILocation {
   zipCode: string;
   address: string;
   country: string;
-  coordinates: number[]; // [longitude, latitude]
+  coordinates: {
+    type: "Point";
+    coordinates: number[];
+  }; // [longitude, latitude]
 }
 
 export interface IMechanicProfile {

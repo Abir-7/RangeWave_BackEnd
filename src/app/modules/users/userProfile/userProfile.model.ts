@@ -51,7 +51,11 @@ const userProfileSchema = new Schema<IUserProfile>({
       type: String,
     },
     coordinates: {
-      type: [Number],
+      type: { type: String, enum: ["Point"], required: true }, // 'Point' is the type
+      coordinates: {
+        type: [Number], // Array of numbers (longitude, latitude)
+        required: true,
+      },
     },
     default: {},
   },
@@ -59,6 +63,7 @@ const userProfileSchema = new Schema<IUserProfile>({
   user: { type: Schema.Types.ObjectId, ref: "User", unique: true },
   carInfo: carInfoSchema,
 });
+userProfileSchema.index({ "location.coordinates": "2dsphere" });
 
 export const UserProfile = model<IUserProfile>(
   "UserProfile",

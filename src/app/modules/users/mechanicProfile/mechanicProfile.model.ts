@@ -54,6 +54,7 @@ const CertificateSchema = new Schema<ICertificate>(
 );
 
 // MechanicProfile Schema
+// MechanicProfile Schema
 const MechanicProfileSchema = new Schema<IMechanicProfile>(
   {
     fullName: {
@@ -86,14 +87,10 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
         type: String,
       },
       coordinates: {
-        type: [Number],
-        default: [],
-        validate: {
-          validator: function (v: [number, number]) {
-            return v.length === 2 && !isNaN(v[0]) && !isNaN(v[1]);
-          },
-          message:
-            "Coordinates should be an array of two numbers [longitude, latitude]",
+        type: { type: String, enum: ["Point"], required: true }, // 'Point' is the type
+        coordinates: {
+          type: [Number], // Array of numbers (longitude, latitude)
+          required: true,
         },
       },
     },
@@ -120,6 +117,9 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
   },
   { timestamps: true }
 );
+
+// Add a 2dsphere index to the coordinates field
+MechanicProfileSchema.index({ "location.coordinates": "2dsphere" });
 
 // Create and export the model
 export const MechanicProfile = model("MechanicProfile", MechanicProfileSchema);

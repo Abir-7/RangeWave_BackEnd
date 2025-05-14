@@ -48,8 +48,9 @@ const updateMechanicProfile = async (
         ] = (locations as Record<string, string>)[field];
       }
 
-      if (coordinates?.length === 2) {
-        mechanicProfile.location.coordinates = coordinates;
+      if (coordinates?.coordinates.length === 2) {
+        mechanicProfile.location.coordinates.coordinates =
+          coordinates.coordinates;
       }
     }
 
