@@ -4,9 +4,9 @@ import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
 import { ServiceService } from "./service.service";
 
-const createService = catchAsync(async (req: Request, res: Response) => {
+const addServiceReq = catchAsync(async (req: Request, res: Response) => {
   const serviceData = req.body;
-  const result = await ServiceService.createService(
+  const result = await ServiceService.addServiceReq(
     serviceData,
     req.user.userId
   );
@@ -51,9 +51,23 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+// for mechanics
+const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
+  const { sId } = req.params;
+
+  const result = await ServiceService.seeServiceDetails(sId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Service details is fetched successfully",
+    data: result,
+  });
+});
+
 export const ServiceController = {
-  createService,
+  addServiceReq,
   getBidListOfService,
   hireMechanic,
   cancelService,
+  seeServiceDetails,
 };

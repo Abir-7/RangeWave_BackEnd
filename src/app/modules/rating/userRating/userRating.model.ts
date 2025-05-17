@@ -21,6 +21,11 @@ const userRatingSchema = new Schema<IUserRating>(
       ref: "User",
       required: true,
     },
+    serviceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Service",
+      required: true,
+    },
   },
   { timestamps: true }
 );

@@ -51,10 +51,9 @@ const userProfileSchema = new Schema<IUserProfile>({
       type: String,
     },
     coordinates: {
-      type: { type: String, enum: ["Point"], required: true }, // 'Point' is the type
+      type: { type: String, enum: ["Point"] }, // 'Point' is the type
       coordinates: {
         type: [Number], // Array of numbers (longitude, latitude)
-        required: true,
       },
     },
     default: {},

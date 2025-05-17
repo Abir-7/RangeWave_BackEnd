@@ -8,6 +8,7 @@ const addRatingToUser = async (
   ratingData: {
     rating: number;
     user: string;
+    serviceId: string;
   },
   mechanicId: string
 ) => {
@@ -18,6 +19,15 @@ const addRatingToUser = async (
 
   if (!userData) {
     throw new AppError(status.NOT_FOUND, "User not found.");
+  }
+
+  const isExist = await UserRating.findOne({
+    serviceId: ratingData.serviceId,
+    user: ratingData.user,
+  });
+
+  if (isExist) {
+    throw new AppError(status.NOT_FOUND, "Rating already given.");
   }
 
   const newRating = await UserRating.create({

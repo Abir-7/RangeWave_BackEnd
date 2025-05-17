@@ -25,6 +25,24 @@ app.get("/", (req, res) => {
   res.send("Hello World! This app name is Ai_Finance_Hub");
 });
 
+// Onboarding refresh route
+app.get("/stripe/onboarding/refresh", (req, res) => {
+  res.send(`
+    <h1>Onboarding Interrupted</h1>
+    <p>Looks like something went wrong or you canceled onboarding.</p>
+    <a href="/start-onboarding">Try Again</a>
+  `);
+});
+
+// Onboarding success route
+app.get("/stripe/onboarding/success", (req, res) => {
+  res.send(`
+    <h1>Onboarding Complete!</h1>
+    <p>Your Stripe account is ready to receive payments.</p>
+    <a href="/dashboard">Go to Dashboard</a>
+  `);
+});
+
 app.use(express.static(path.join(process.cwd(), "uploads")));
 
 app.use(globalErrorHandler);

@@ -10,11 +10,104 @@ import getOtp from "../../utils/helper/getOtp";
 import { sendEmail } from "../../utils/sendEmail";
 import getHashedPassword from "../../utils/helper/getHashedPassword";
 import { appConfig } from "../../config";
+import { jwtDecode } from "jwt-decode";
+import { UserProfile } from "../users/userProfile/userProfile.model";
+import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model";
+import { startSession } from "mongoose";
+import { IUser } from "../users/user/user.interface";
+import { TUserRole } from "../../interface/auth.interface";
+
+const createUser = async (
+  data: {
+    email: string;
+    fullName: string;
+    password: string;
+  },
+  role: TUserRole
+): Promise<Partial<IUser>> => {
+  if (!role) {
+    throw new AppError(status.BAD_REQUEST, "User role is required.");
+  }
+  let isExist: any;
+  isExist = await User.findOne({ email: data.email });
+
+  if (isExist?.isVerified === false) {
+    await User.findOneAndDelete({ email: data.email });
+    await UserProfile.findOneAndDelete({ email: data.email });
+    isExist = null;
+  }
+
+  if (isExist) {
+    throw new AppError(status.BAD_REQUEST, "Email already Exist");
+  }
+
+  const session = await startSession(); // Start a session for the transaction
+  session.startTransaction(); // Begin the transaction
+
+  try {
+    const hashedPassword = await getHashedPassword(data.password);
+    const otp = getOtp(4);
+    const expDate = getExpiryTime(10);
+
+    // User data
+    const userData = {
+      email: data.email,
+      password: hashedPassword,
+      authentication: { otp, expDate },
+    };
+
+    // Create user
+    const createdUser = await User.create([{ ...userData, role }], { session });
+
+    // User profile data
+    const userProfileData = {
+      fullName: data.fullName,
+      email: createdUser[0].email,
+      user: createdUser[0]._id,
+    };
+
+    // Create profile based on the role
+    if (role === "USER") {
+      await UserProfile.create([userProfileData], { session });
+    }
+    if (role === "MECHANIC") {
+      await MechanicProfile.create([userProfileData], { session });
+    }
+
+    // Send email verification
+    await sendEmail(
+      data.email,
+      "Email Verification Code",
+      `Your code is: ${otp}`
+    );
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession(); // End the session
+
+    return {
+      email: createdUser[0].email,
+      isVerified: createdUser[0].isVerified,
+    };
+  } catch (error: any) {
+    // If any error occurs, abort the transaction
+    await session.abortTransaction();
+    session.endSession(); // End the session
+
+    // Rethrow the error so the caller can handle it
+    throw new AppError(status.INTERNAL_SERVER_ERROR, error);
+  }
+};
 
 const userLogin = async (loginData: {
   email: string;
   password: string;
-}): Promise<{ accessToken: string; userData: any; refreshToken: string }> => {
+}): Promise<{
+  accessToken: string;
+  userData: any;
+  refreshToken: string;
+  decodedData: object;
+}> => {
   const userData = await User.findOne({ email: loginData.email }).select(
     "+password"
   );
@@ -50,8 +143,15 @@ const userLogin = async (loginData: {
     appConfig.jwt.jwt_refresh_exprire
   );
 
+  const decodedData = jwtDecode(accessToken);
+
   return {
     accessToken,
+    decodedData: {
+      ...decodedData,
+      iat: (decodedData.iat ?? 0) * 1000,
+      exp: (decodedData.exp ?? 0) * 1000,
+    },
     refreshToken,
     userData: {
       ...userData.toObject(),
@@ -69,6 +169,7 @@ const verifyUser = async (
   isVerified: boolean | undefined;
   needToResetPass: boolean | undefined;
   token: string | null;
+  decodedData: object;
 }> => {
   if (!otp) {
     throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
@@ -112,6 +213,12 @@ const verifyUser = async (
       { new: true }
     );
   } else {
+    token = jsonWebToken.generateToken(
+      { userEmail: user.email, userId: user._id, userRole: user.role },
+      appConfig.jwt.jwt_access_secret as string,
+      "10m"
+    );
+
     updatedUser = await User.findOneAndUpdate(
       { email: user.email },
       {
@@ -123,12 +230,19 @@ const verifyUser = async (
     );
   }
 
+  const decodedData = jwtDecode(token);
+
   return {
     userId: updatedUser?._id as string,
     email: updatedUser?.email,
     isVerified: updatedUser?.isVerified,
     needToResetPass: updatedUser?.needToResetPass,
     token: token,
+    decodedData: {
+      ...decodedData,
+      iat: (decodedData.iat ?? 0) * 1000,
+      exp: (decodedData.exp ?? 0) * 1000,
+    },
   };
 };
 
@@ -226,8 +340,12 @@ const resetPassword = async (
 };
 
 const getNewAccessToken = async (
-  refreshToken: string
-): Promise<{ accessToken: string }> => {
+  tokenWithBearer: string
+): Promise<{ accessToken: string; decodedData: object }> => {
+  if (!tokenWithBearer || !tokenWithBearer.startsWith("Bearer")) {
+    throw new AppError(status.UNAUTHORIZED, "You are not authorized");
+  }
+  const refreshToken = tokenWithBearer.split(" ")[1];
   if (!refreshToken) {
     throw new AppError(status.UNAUTHORIZED, "Refresh token not found.");
   }
@@ -250,7 +368,16 @@ const getNewAccessToken = async (
       appConfig.jwt.jwt_access_secret as string,
       appConfig.jwt.jwt_access_exprire
     );
-    return { accessToken };
+
+    const decodedData = jwtDecode(accessToken);
+    return {
+      accessToken,
+      decodedData: {
+        ...decodedData,
+        iat: (decodedData.iat ?? 0) * 1000,
+        exp: (decodedData.exp ?? 0) * 1000,
+      },
+    };
   } else {
     throw new AppError(status.UNAUTHORIZED, "You are unauthorized.");
   }
@@ -321,6 +448,7 @@ const reSendOtp = async (userEmail: string) => {
   return { message: "Verification code send." };
 };
 export const AuthService = {
+  createUser,
   userLogin,
   verifyUser,
   forgotPasswordRequest,

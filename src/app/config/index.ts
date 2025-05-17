@@ -9,6 +9,7 @@ export const appConfig = {
     port: process.env.PORT,
     node_env: process.env.NODE_ENV,
     ip: process.env.IP_ADDRESS,
+    base_url: process.env.BASE_URI,
   },
 
   jwt: {
@@ -34,5 +35,8 @@ export const appConfig = {
   admin: {
     email: process.env.ADMIN_EMAIL,
     password: process.env.ADMIN_PASSWORD,
+  },
+  stripe: {
+    secret_key: process.env.STRIPE_SECRET_KEY,
   },
 };

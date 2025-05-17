@@ -4,4 +4,5 @@ export interface IMechanicRating {
   rating: number;
   mechanicId: Types.ObjectId;
   user: Types.ObjectId;
+  serviceId: Types.ObjectId;
 }

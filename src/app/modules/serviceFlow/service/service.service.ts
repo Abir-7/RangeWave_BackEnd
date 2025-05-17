@@ -8,14 +8,32 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 import MechanicRating from "../../rating/mechanicRating/mechanicRating.model";
 import { IMechanicProfile } from "../../users/mechanicProfile/mechanicProfile.interface";
 
-const createService = async (
+const addServiceReq = async (
   serviceData: Partial<IService>,
   userId: string
 ): Promise<IService> => {
+  const today = new Date();
+  // Set time range for today (start and end)
+  const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+  const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+  // Query to find if any service exists with given statuses for this user today
+  const existingService = await Service.findOne({
+    user: userId,
+    status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+    createdAt: { $gte: startOfDay, $lte: endOfDay },
+  });
+
+  if (existingService) {
+    throw new Error(
+      "You already have an active service request today with status finding, working, or waiting."
+    );
+  }
+
+  // If no conflict, create the new service
   const service = await Service.create({ ...serviceData, user: userId });
   return service;
 };
-
 const getDistance = (
   coords1: [number, number],
   coords2: [number, number]
@@ -148,7 +166,7 @@ const hireMechanic = async (bidId: string, userId: string) => {
     throw new Error("Service not found.");
   }
 
-  serviceData.status = Status.WAITING;
+  serviceData.status = Status.UNPAID;
   await serviceData.save();
   return { ...bidData, reqServiceId: serviceData.toObject() };
 };
@@ -165,8 +183,28 @@ const cancelService = async (
   return service;
 };
 
+// for mechanics
+const seeServiceDetails = async (sId: string): Promise<IService> => {
+  const service = await Service.findById(sId).populate({
+    path: "user",
+    model: "UserProfile",
+    foreignField: "user",
+    select: "location fullName image -_id ",
+    populate: {
+      path: "user",
+      model: "User",
+      foreignField: "_id",
+      select: " -authentication -needToResetPass -needToUpdateProfile -__v ",
+    },
+  });
+  if (!service) {
+    throw new Error("Service not found");
+  }
+  return service;
+};
+
 // for socket-------------------
-export const sendBidTouser = async (
+export const sendBidToUser = async (
   serviceId: string,
   userId: string,
   mechanicId: string
@@ -184,6 +222,7 @@ export const sendBidTouser = async (
 
   // Fetch the user profile and check for location data
   const userProfile = await UserProfile.findOne({ user: userId });
+
   if (!userProfile || !userProfile.location?.coordinates.coordinates) {
     throw new Error("User location not found");
   }
@@ -246,8 +285,9 @@ export const sendBidTouser = async (
 };
 
 export const ServiceService = {
-  createService,
+  addServiceReq,
   getBidListOfService,
   hireMechanic,
   cancelService,
+  seeServiceDetails,
 };

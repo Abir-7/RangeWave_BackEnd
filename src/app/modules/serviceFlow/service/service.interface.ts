@@ -11,6 +11,7 @@ export interface IService {
 export enum Status {
   FINDING = "finding",
   WORKING = "working",
+  UNPAID = "unpaid",
   WAITING = "waiting",
   CANCELLED = "Cancelled",
   COMPLETED = "COMPLETED",

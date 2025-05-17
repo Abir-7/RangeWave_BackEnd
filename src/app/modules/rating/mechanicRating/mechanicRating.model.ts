@@ -15,6 +15,11 @@ const mechanicRatingSchema = new Schema<IMechanicRating>(
       ref: "User",
       required: true,
     },
+    serviceId: {
+      type: Schema.Types.ObjectId,
+      ref: "Service",
+      required: true,
+    },
     user: {
       type: Schema.Types.ObjectId,
       ref: "User",

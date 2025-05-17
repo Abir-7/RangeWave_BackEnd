@@ -5,7 +5,7 @@ import { auth } from "../../middleware/auth/auth";
 const router = Router();
 
 //for user only
-router.post("/req-for-help", auth("USER"), ServiceController.createService);
+router.post("/req-for-help", auth("USER"), ServiceController.addServiceReq);
 router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 
 //for mechanics

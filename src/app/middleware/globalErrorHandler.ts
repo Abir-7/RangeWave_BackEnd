@@ -39,6 +39,7 @@ export const globalErrorHandler = async (
       },
     ];
   } else if (err instanceof mongoose.Error.CastError) {
+    console.log("object");
     statusCode = 400;
     message = `Invalid value for ${err.path}`;
     errors = [

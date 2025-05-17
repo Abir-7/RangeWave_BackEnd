@@ -5,11 +5,24 @@ import sendResponse from "../../utils/sendResponse";
 import { AuthService } from "./auth.service";
 import { appConfig } from "../../config";
 import logger from "../../utils/logger";
+import { TUserRole } from "../../interface/auth.interface";
+
+const createUser = catchAsync(async (req, res) => {
+  const { role, ...other } = req.body;
+  const result = await AuthService.createUser(other, role as TUserRole);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "User successfully created.Check your email for code.",
+    data: result,
+  });
+});
 
 const userLogin = catchAsync(async (req, res, next) => {
   const result = await AuthService.userLogin(req.body);
 
-  res.cookie("refreshToken", result.refreshToken, {
+  res.cookie("refreshToken", `Bearer ${result.refreshToken}`, {
     secure: appConfig.server.node_env === "production",
     httpOnly: true,
   });
@@ -61,7 +74,9 @@ const resetPassword = catchAsync(async (req, res, next) => {
 });
 
 const getNewAccessToken = catchAsync(async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
+  const refreshToken =
+    req.cookies.refreshToken || (req.headers.authorization as string);
+
   const result = await AuthService.getNewAccessToken(refreshToken);
   sendResponse(res, {
     data: result,
@@ -95,6 +110,7 @@ const reSendOtp = catchAsync(async (req, res) => {
 });
 
 export const AuthController = {
+  createUser,
   verifyUser,
   forgotPasswordRequest,
   resetPassword,

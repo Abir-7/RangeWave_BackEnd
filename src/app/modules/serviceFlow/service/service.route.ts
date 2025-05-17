@@ -5,7 +5,7 @@ import { auth } from "../../../middleware/auth/auth";
 const router = Router();
 
 //for user only
-router.post("/req-for-help", auth("USER"), ServiceController.createService);
+router.post("/req-for-help", auth("USER"), ServiceController.addServiceReq);
 
 router.get(
   "/list-of-bid/:sId",
@@ -18,6 +18,11 @@ router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
 router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 
 //for mechanics
+router.get(
+  "/see-details/:sId",
+  auth("MECHANIC"),
+  ServiceController.seeServiceDetails
+);
 
 //for both
 

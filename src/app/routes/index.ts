@@ -8,6 +8,7 @@ import { BidRoute } from "../modules/serviceFlow/bid/bid.route";
 
 import { MechanicRatingRoute } from "../modules/rating/mechanicRating/mechanicRating.route";
 import { UserRatingRoute } from "../modules/rating/userRating/userRating.route";
+import { StripeRoute } from "../modules/stripe/stripe.route";
 
 const router = Router();
 
@@ -20,6 +21,7 @@ const apiRoutes = [
   { path: "/bid", route: BidRoute },
   { path: "/rating", route: MechanicRatingRoute },
   { path: "/rating", route: UserRatingRoute },
+  { path: "/stripe", route: StripeRoute },
 ];
 
 apiRoutes.forEach((route) => router.use(route.path, route.route));
