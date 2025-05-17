@@ -4,8 +4,7 @@ import sendResponse from "../../utils/sendResponse";
 import { StripeService } from "./stripe.service";
 
 const createAndConnect = catchAsync(async (req: Request, res: Response) => {
-  const { mechanicId } = req.body;
-  const result = await StripeService.createAndConnect(mechanicId);
+  const result = await StripeService.createAndConnect(req.user.userEmail);
   sendResponse(res, {
     success: true,
     statusCode: 200,

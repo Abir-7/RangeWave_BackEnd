@@ -1,11 +1,14 @@
 import { appConfig } from "../../config";
 import { stripe } from "./stripe";
 
-const createAndConnect = async (mechanicId: string) => {
+const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
     type: "express",
-    capabilities: { transfers: { requested: true } },
-    metadata: { mechanicId },
+    email: mechanicEmail,
+    capabilities: {
+      card_payments: { requested: true },
+      transfers: { requested: true },
+    },
   });
 
   // Save account.id to DB mapped to this mechanicId

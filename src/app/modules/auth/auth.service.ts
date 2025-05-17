@@ -168,8 +168,9 @@ const verifyUser = async (
   email: string | undefined;
   isVerified: boolean | undefined;
   needToResetPass: boolean | undefined;
-  token: string | null;
+  accessToken: string | null;
   decodedData: object;
+  refreshToken: string;
 }> => {
   if (!otp) {
     throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
@@ -190,12 +191,12 @@ const verifyUser = async (
   if (otp !== user.authentication.otp) {
     throw new AppError(status.BAD_REQUEST, "Code not matched.");
   }
-
+  let refreshToken = "";
   let updatedUser;
   let token = null;
   if (user.isVerified) {
     token = jsonWebToken.generateToken(
-      { userEmail: user.email },
+      { userEmail: user.email, userId: user._id, userRole: user.role },
       appConfig.jwt.jwt_access_secret as string,
       "10m"
     );
@@ -216,9 +217,13 @@ const verifyUser = async (
     token = jsonWebToken.generateToken(
       { userEmail: user.email, userId: user._id, userRole: user.role },
       appConfig.jwt.jwt_access_secret as string,
-      "10m"
+      appConfig.jwt.jwt_access_exprire
     );
-
+    refreshToken = jsonWebToken.generateToken(
+      { userEmail: user.email, userId: user._id, userRole: user.role },
+      appConfig.jwt.jwt_refresh_secret as string,
+      appConfig.jwt.jwt_refresh_exprire
+    );
     updatedUser = await User.findOneAndUpdate(
       { email: user.email },
       {
@@ -237,7 +242,8 @@ const verifyUser = async (
     email: updatedUser?.email,
     isVerified: updatedUser?.isVerified,
     needToResetPass: updatedUser?.needToResetPass,
-    token: token,
+    accessToken: token,
+    refreshToken: refreshToken,
     decodedData: {
       ...decodedData,
       iat: (decodedData.iat ?? 0) * 1000,
