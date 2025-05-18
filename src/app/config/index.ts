@@ -39,4 +39,7 @@ export const appConfig = {
   stripe: {
     secret_key: process.env.STRIPE_SECRET_KEY,
   },
+  encrypt: {
+    s_key: process.env.ENCRYPTION_SECRET_KEY,
+  },
 };

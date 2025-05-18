@@ -5,11 +5,6 @@ export interface IWorkingHour {
   end: string; // e.g., "15:00"
 }
 
-export interface IExperience {
-  workshopName: string;
-  years: number;
-}
-
 export interface ICertificate {
   institutionName: string;
   startTime: string; // "HH:mm"
@@ -38,8 +33,9 @@ export interface IMechanicProfile {
   phoneNumber: string;
   workingHours: IWorkingHour;
   services: string[];
-  experience: IExperience[];
+  experience: string[];
   certificates: ICertificate[];
   image: string;
   user: Types.ObjectId;
+  stripeAccountId: string;
 }

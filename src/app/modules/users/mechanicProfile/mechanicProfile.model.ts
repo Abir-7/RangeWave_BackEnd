@@ -1,6 +1,5 @@
 import {
   ICertificate,
-  IExperience,
   IMechanicProfile,
   IWorkingHour,
 } from "./mechanicProfile.interface";
@@ -13,21 +12,6 @@ const WorkingHourSchema = new Schema<IWorkingHour>(
     },
     end: {
       type: String,
-    },
-  },
-  {
-    _id: false,
-  }
-);
-
-// Experience Schema
-const ExperienceSchema = new Schema<IExperience>(
-  {
-    workshopName: {
-      type: String,
-    },
-    years: {
-      type: Number,
     },
   },
   {
@@ -104,7 +88,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
       default: [], // array of strings
     },
     experience: {
-      type: [ExperienceSchema],
+      type: [String],
       default: [], // array of experiences
     },
     certificates: {
@@ -113,6 +97,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     },
     image: { type: String },
     user: { type: Schema.Types.ObjectId, required: true, ref: "User" },
+    stripeAccountId: { type: String },
   },
   { timestamps: true }
 );
