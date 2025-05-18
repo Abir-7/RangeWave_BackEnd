@@ -10,5 +10,6 @@ export enum PaymentStatus {
   HOLD = "HOLD",
   CANCELLED = "CANCELLED", // or "CANCELED"
   PAID = "PAID",
+  UNPAID = "UNPAID",
   REFUNDED = "REFUNDED",
 }

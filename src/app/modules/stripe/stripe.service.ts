@@ -46,8 +46,19 @@ const createAndConnect = async (mechanicEmail: string) => {
   return { url: accountLink.url, accountId: account.id };
 };
 
-const createPaymentIntent = async (amount: number) => {
-  const convertedAmount = amount * 100;
+const createPaymentIntent = async (bidId: string) => {
+  const bidData = await Bid.findById(bidId);
+
+  if (!bidData) {
+    throw new AppError(status.NOT_FOUND, "Bid data not found");
+  }
+
+  const paymentData = {
+    bidId,
+  };
+  await Payment.create(paymentData);
+
+  const convertedAmount = bidData?.price * 100;
   const paymentIntent = await stripe.paymentIntents.create({
     amount: convertedAmount,
     currency: "usd",
@@ -57,7 +68,6 @@ const createPaymentIntent = async (amount: number) => {
   return { client_secret: paymentIntent.client_secret };
 };
 
-// create a payment data in createPaymentIntent  then update in savePaymentData //! todo
 const savePaymentData = async (data: { txId: string; bidId: string }) => {
   const { txId, bidId } = data;
 
@@ -99,20 +109,20 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
       { status: Status.WAITING },
       { new: true, session }
     );
+    const newPaymentData = await Payment.findOneAndUpdate(
+      { bidId: bidId },
+      { txId, status: PaymentStatus.PAID },
+      { new: true, session } // <-- pass session here
+    );
 
-    // Create Payment document
-    const paymentData = {
-      txId,
-      bidId,
-      status: "HOLD", // optionally set initial status here
-    };
-
-    const newPaymentData = await Payment.create([paymentData], { session });
+    if (!newPaymentData) {
+      throw new AppError(status.NOT_FOUND, "Failed to update payment.");
+    }
 
     // Commit transaction
     await session.commitTransaction();
     await session.endSession();
-    return await newPaymentData[0].populate({
+    return await newPaymentData.populate({
       path: "bidId",
       populate: "reqServiceId",
     });

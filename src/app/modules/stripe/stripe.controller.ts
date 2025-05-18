@@ -13,7 +13,7 @@ const createAndConnect = catchAsync(async (req: Request, res: Response) => {
   });
 });
 const createPaymentIntent = catchAsync(async (req: Request, res: Response) => {
-  const result = await StripeService.createPaymentIntent(req.body.amount);
+  const result = await StripeService.createPaymentIntent(req.body.bidId);
   sendResponse(res, {
     success: true,
     statusCode: 200,

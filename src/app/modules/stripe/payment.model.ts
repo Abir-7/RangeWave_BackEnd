@@ -3,12 +3,12 @@ import { IPayment, PaymentStatus } from "./payment.interface";
 
 const paymentSchema: Schema<IPayment> = new Schema(
   {
-    txId: { type: String, required: true, unique: true },
+    txId: { type: String, unique: true, sparse: true },
     bidId: { type: mongoose.Schema.Types.ObjectId, ref: "Bid", required: true },
     status: {
       type: String,
       enum: Object.values(PaymentStatus),
-      default: PaymentStatus.HOLD,
+      default: PaymentStatus.UNPAID,
       required: true,
     },
   },
