@@ -7,6 +7,7 @@ import {
   IMechanicProfile,
   IWorkingHour,
   IWorkshop,
+  IWorkShopLocation,
 } from "./mechanicProfile.interface";
 import { MechanicProfile } from "./mechanicProfile.model";
 import { removeFalsyFields } from "../../../utils/helper/removeFalsyField";
@@ -29,20 +30,43 @@ const updateMechanicProfile = async (
       throw new AppError(status.NOT_FOUND, "Mechanic profile not found");
     }
 
-    const { certificates, experience, phoneNumber, workshop, fullName } = data;
+    const {
+      location: userLocation,
+      certificates,
+      experience,
+      phoneNumber,
+      workshop,
+      fullName,
+    } = data;
 
     const { location, name, services, workingHours } = workshop as IWorkshop;
 
+    if (userLocation && Object.keys(userLocation).length > 0) {
+      const locations = removeFalsyFields(
+        userLocation as unknown as Record<string, unknown>
+      );
+      console.log(locations);
+      for (const field in locations) {
+        mechanicProfile.location[field as keyof ILocation] = (
+          locations as Record<string, string>
+        )[field];
+      }
+    }
+    console.log("object");
     if (location && Object.keys(location).length > 0) {
       const { coordinates, ...other } = location;
-      const locations = removeFalsyFields(other) as Partial<ILocation>;
+      const locations = removeFalsyFields(other) as Omit<
+        IWorkShopLocation,
+        "coordinates"
+      >;
       for (const field in locations) {
-        mechanicProfile.location[
-          field as keyof Omit<ILocation, "coordinates">
+        mechanicProfile.workshop.location[
+          field as keyof Omit<IWorkShopLocation, "coordinates">
         ] = (locations as Record<string, string>)[field];
       }
 
       if (coordinates?.coordinates.length === 2) {
+        mechanicProfile.workshop.location.coordinates.type = "Point";
         mechanicProfile.workshop.location.coordinates.coordinates =
           coordinates.coordinates;
       }

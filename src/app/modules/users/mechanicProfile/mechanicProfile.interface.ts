@@ -38,12 +38,14 @@ export interface IWorkshop {
   name: string;
   workingHours: IWorkingHour;
   services: string[];
-  location: {
-    name: string;
-    placeId: string;
-    coordinates: {
-      type: "Point";
-      coordinates: number[];
-    }; // [longitude, latitude]
-  };
+  location: IWorkShopLocation;
+}
+
+export interface IWorkShopLocation {
+  name: string;
+  placeId: string;
+  coordinates: {
+    type: "Point";
+    coordinates: number[];
+  }; // [longitude, latitude]
 }

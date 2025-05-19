@@ -7,51 +7,49 @@ import {
 } from "./mechanicProfile.interface";
 
 const WorkingHourSchema = new Schema<IWorkingHour>({
-  start: { type: String, required: true },
-  end: { type: String, required: true },
+  start: { type: String },
+  end: { type: String },
 });
 
 const CertificateSchema = new Schema<ICertificate>({
-  institutionName: { type: String, required: true },
-  startTime: { type: String, required: true },
-  endTime: { type: String, required: true },
+  institutionName: { type: String },
+  startTime: { type: String },
+  endTime: { type: String },
 });
 
 const LocationSchema = new Schema<ILocation>({
-  apartmentNo: { type: String, required: true },
-  roadNo: { type: String, required: true },
-  state: { type: String, required: true },
-  city: { type: String, required: true },
-  zipCode: { type: String, required: true },
-  address: { type: String, required: true },
-  country: { type: String, required: true },
+  apartmentNo: { type: String },
+  roadNo: { type: String },
+  state: { type: String },
+  city: { type: String },
+  zipCode: { type: String },
+  address: { type: String },
+  country: { type: String },
 });
 
 const MechanicProfileSchema = new Schema<IMechanicProfile>(
   {
-    fullName: { type: String, required: true },
-    email: { type: String, required: true },
-    location: { type: LocationSchema, required: true },
-    phoneNumber: { type: String, required: true },
-    image: { type: String, required: true },
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    stripeAccountId: { type: String, required: true },
+    fullName: { type: String },
+    email: { type: String },
+    location: { type: LocationSchema, default: {} },
+    phoneNumber: { type: String },
+    image: { type: String },
+    user: { type: Schema.Types.ObjectId, ref: "User" },
+    stripeAccountId: { type: String },
     workshop: {
-      name: { type: String, required: true },
-      workingHours: { type: WorkingHourSchema, required: true },
+      name: { type: String },
+      workingHours: { type: WorkingHourSchema, default: {} },
       services: [{ type: String }],
       location: {
-        name: { type: String, required: true },
-        placeId: { type: String, required: true },
+        name: { type: String },
+        placeId: { type: String },
         coordinates: {
           type: {
             type: String,
             enum: ["Point"],
-            required: true,
           },
           coordinates: {
             type: [Number],
-            required: true,
           },
         },
       },

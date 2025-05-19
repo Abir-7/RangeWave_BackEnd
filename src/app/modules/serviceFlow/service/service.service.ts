@@ -3,10 +3,7 @@ import Service from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 import { BidStatus } from "../bid/bid.interface";
-import { UserProfile } from "../../users/userProfile/userProfile.model";
-import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
-import MechanicRating from "../../rating/mechanicRating/mechanicRating.model";
-import { IMechanicProfile } from "../../users/mechanicProfile/mechanicProfile.interface";
+import { StripeService } from "../../stripe/stripe.service";
 
 const addServiceReq = async (
   serviceData: {
@@ -53,116 +50,129 @@ const addServiceReq = async (
   });
   return service;
 };
-const getDistance = (
+const calculateDistance = (
   coords1: [number, number],
   coords2: [number, number]
 ): number => {
-  const R = 6371; // Earth radius in km
+  console.log(coords1, coords2);
 
-  // Swap the order to match (longitude, latitude)
-  const [lon1, lat1] = coords1; // Longitude, Latitude for point 1
-  const [lon2, lat2] = coords2; // Longitude, Latitude for point 2
+  const R = 6371; // km
+
+  const [lon1, lat1] = coords1;
+  const [lon2, lat2] = coords2;
 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
+
+  let dLon = lon2 - lon1;
+  if (dLon > 180) {
+    dLon -= 360;
+  } else if (dLon < -180) {
+    dLon += 360;
+  }
+  dLon = dLon * (Math.PI / 180);
+
+  const lat1Rad = lat1 * (Math.PI / 180);
+  const lat2Rad = lat2 * (Math.PI / 180);
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) ** 2;
+
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  return Number((R * c).toFixed(2)); // Distance in kilometers
+  return Number((R * c).toFixed(2));
 };
 
 const getBidListOfService = async (serviceId: string, userId: string) => {
-  // Step 1: Fetch the service with the required status and user
   const service = await Service.findOne({
     _id: serviceId,
     status: Status.FINDING,
     user: userId,
-  });
+  }).lean();
 
-  if (!service) {
-    throw new Error("Service not found");
+  if (!service || !service.location?.coordinates) {
+    throw new Error("Service not found or missing location");
   }
 
-  // Step 2: Fetch user profile and ensure location coordinates are present
-  const userProfile = await UserProfile.findOne({ user: userId });
-  if (!userProfile || !userProfile.location?.coordinates?.coordinates) {
-    throw new Error("User location not found");
-  }
+  const bids = await Bid.aggregate([
+    { $match: { reqServiceId: service._id } },
 
-  // Step 3: Fetch all bids for the service
-  const bids = await Bid.find({
-    reqServiceId: serviceId,
-    status: BidStatus.provided,
-  }); // Use populate to retrieve mechanic data in a single query
-
-  // Step 4: Fetch mechanic ratings in one batch
-  const mechanicRatings = await MechanicRating.aggregate([
+    // Step 1: Join Mechanic Profile
     {
-      $match: { mechanicId: { $in: bids.map((bid) => bid.mechanicId._id) } },
+      $lookup: {
+        from: "mechanicprofiles",
+        localField: "mechanicId",
+        foreignField: "user",
+        as: "mechanicProfile",
+      },
     },
+    { $unwind: "$mechanicProfile" },
+
+    // Step 2: Join Mechanic Ratings (all ratings of that mechanic)
     {
-      $group: {
-        _id: "$mechanicId",
-        avgRating: { $avg: "$rating" },
+      $lookup: {
+        from: "mechanicratings",
+        localField: "mechanicId",
+        foreignField: "mechanicId",
+        as: "ratingDocs",
+      },
+    },
+
+    // Step 3: Calculate average rating and count
+    {
+      $addFields: {
+        averageRating: {
+          $cond: [
+            { $gt: [{ $size: "$ratingDocs" }, 0] },
+            {
+              $avg: "$ratingDocs.rating",
+            },
+            0,
+          ],
+        },
+        totalReviews: { $size: "$ratingDocs" },
+      },
+    },
+
+    // Step 4: Project only needed fields
+    {
+      $project: {
+        price: 1,
+        status: 1,
+        mechanicId: 1,
+        averageRating: { $round: ["$averageRating", 1] },
+        totalReviews: 1,
+        "mechanicProfile.fullName": 1,
+        "mechanicProfile.image": 1,
+        "mechanicProfile.workshop.name": 1,
+        "mechanicProfile.workshop.location.placeId": 1,
+        "mechanicProfile.workshop.location.coordinates":
+          "$mechanicProfile.workshop.location.coordinates.coordinates",
       },
     },
   ]);
 
-  // Step 5: Create a map of mechanic ratings for quick lookup
-  const mechanicRatingsMap = mechanicRatings.reduce(
-    (acc, { _id, avgRating }) => {
-      acc[_id] = avgRating;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
+  // Step 5: Add distance in Node.js (still more efficient this way)
+  return bids.map((bid) => {
+    const coords =
+      bid.mechanicProfile?.workshop?.location?.coordinates?.coordinates;
 
-  // Step 6: Preload all mechanic profiles in a single batch
-  const mechanicProfiles = await MechanicProfile.find({
-    user: { $in: bids.map((bid) => bid.mechanicId._id) },
-  });
-
-  // Step 7: Create a map of mechanic profiles for quick lookup
-  const mechanicProfilesMap = mechanicProfiles.reduce((acc, profile) => {
-    acc[profile.user.toString()] = profile;
-    return acc;
-  }, {} as Record<string, IMechanicProfile>);
-
-  // Step 8: Calculate distance and augment bids with relevant details
-  const bidsWithDetails = bids.map((bid) => {
-    const mechanicProfile = mechanicProfilesMap[bid.mechanicId._id.toString()];
-    const mechanicRating =
-      mechanicRatingsMap[bid.mechanicId._id.toString()] || 0;
-    const distance = getDistance(
-      (userProfile.location?.coordinates.coordinates as [number, number]) || [
-        0, 0,
-      ],
-      mechanicProfile.location.coordinates.coordinates as [number, number]
-    );
+    const distance = coords
+      ? calculateDistance(
+          service.location.coordinates.coordinates as [number, number],
+          coords
+        )
+      : null;
 
     return {
-      ...bid.toObject(),
-      mechanicProfile: {
-        user: mechanicProfile.user,
-        fullName: mechanicProfile.fullName,
-        image: mechanicProfile.image,
-        phoneNumber: mechanicProfile.phoneNumber,
-        email: mechanicProfile.email,
-      },
-      avgRating: mechanicRating,
-      distance,
+      ...bid,
+
+      distance: distance ? parseFloat(distance.toFixed(2)) : null,
     };
   });
-
-  return bidsWithDetails;
 };
 
+// call payment intent function from stripe.service.ts file
 const hireMechanic = async (bidId: string, userId: string) => {
   const bidData = await Bid.findOne({
     _id: bidId,
@@ -186,7 +196,20 @@ const hireMechanic = async (bidId: string, userId: string) => {
 
   serviceData.status = Status.UNPAID;
   await serviceData.save();
-  return { ...bidData, reqServiceId: serviceData.toObject() };
+
+  const paymentIntent = await StripeService.createPaymentIntent(bidId);
+
+  return {
+    ...bidData,
+    reqServiceId: {
+      ...serviceData.toObject(),
+      location: {
+        coordinates: serviceData.location.coordinates.coordinates,
+        placeId: serviceData.location.placeId,
+      },
+    },
+    paymentIntent,
+  };
 };
 const cancelService = async (
   id: string,
@@ -202,23 +225,31 @@ const cancelService = async (
 };
 
 // for mechanics
-const seeServiceDetails = async (sId: string): Promise<IService> => {
-  const service = await Service.findById(sId).populate({
-    path: "user",
-    model: "UserProfile",
-    foreignField: "user",
-    select: "location fullName image -_id ",
-    populate: {
+const seeServiceDetails = async (sId: string) => {
+  const service = await Service.findById(sId)
+    .populate({
       path: "user",
-      model: "User",
-      foreignField: "_id",
-      select: " -authentication -needToResetPass -needToUpdateProfile -__v ",
-    },
-  });
+      model: "UserProfile",
+      foreignField: "user",
+      select: " fullName image -_id ",
+      populate: {
+        path: "user",
+        model: "User",
+        foreignField: "_id",
+        select: " -authentication -needToResetPass -needToUpdateProfile -__v ",
+      },
+    })
+    .lean();
   if (!service) {
     throw new Error("Service not found");
   }
-  return service;
+  return {
+    ...service,
+    location: {
+      placeId: service.location.placeId,
+      coordinates: service.location.coordinates.coordinates,
+    },
+  };
 };
 
 export const ServiceService = {

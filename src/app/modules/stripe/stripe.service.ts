@@ -46,6 +46,7 @@ const createAndConnect = async (mechanicEmail: string) => {
   return { url: accountLink.url, accountId: account.id };
 };
 
+// its only use when hire mecanic function is call is service.service.ts file
 const createPaymentIntent = async (bidId: string) => {
   const bidData = await Bid.findById(bidId);
 
@@ -94,8 +95,7 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
         model: "MechanicProfile",
         localField: "mechanicId",
         foreignField: "user",
-        select:
-          "-location -certificates -experience -workshopName -workingHours -services -__v",
+        select: "-location -certificates -experience   -__v",
       })
       .session(session);
 
@@ -111,12 +111,15 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
     );
     const newPaymentData = await Payment.findOneAndUpdate(
       { bidId: bidId },
-      { txId, status: PaymentStatus.PAID },
+      { txId, status: PaymentStatus.HOLD },
       { new: true, session } // <-- pass session here
     );
 
     if (!newPaymentData) {
-      throw new AppError(status.NOT_FOUND, "Failed to update payment.");
+      throw new AppError(
+        status.NOT_FOUND,
+        "Failed to update payment. Data not found"
+      );
     }
 
     // Commit transaction
@@ -124,9 +127,9 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
     await session.endSession();
     return await newPaymentData.populate({
       path: "bidId",
-      populate: "reqServiceId",
     });
   } catch (error: any) {
+    console.log(error);
     await session.abortTransaction();
     await session.endSession();
     throw new Error(error);
