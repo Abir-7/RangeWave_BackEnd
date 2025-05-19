@@ -48,10 +48,12 @@ const updateUserProfile = async (
           tagNumber: "",
         };
       }
-      const newCarInfo = removeFalsyFields(carInfo);
+      const newCarInfo = removeFalsyFields(
+        carInfo as unknown as Record<string, unknown>
+      );
       for (const key in newCarInfo) {
         const value = newCarInfo[key as keyof typeof newCarInfo];
-        if (value) {
+        if (value && typeof value === "string") {
           profileData.carInfo[key as keyof typeof profileData.carInfo] = value;
         }
       }
@@ -59,16 +61,13 @@ const updateUserProfile = async (
 
     // Update location if provided
     if (location && Object.keys(location).length > 0) {
-      const { coordinates, ...other } = location;
+      const { ...other } = location;
       const locations = removeFalsyFields(other) as Partial<ILocation>;
       if (profileData.location) {
         for (const field in locations) {
-          profileData.location[field as keyof Omit<ILocation, "coordinates">] =
-            (locations as Record<string, string>)[field];
-        }
-
-        if (coordinates && coordinates.coordinates.length === 2) {
-          profileData.location.coordinates = coordinates;
+          profileData.location[field as keyof ILocation] = (
+            locations as Record<string, string>
+          )[field];
         }
       }
     }

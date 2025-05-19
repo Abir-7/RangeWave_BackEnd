@@ -1,105 +1,67 @@
+import { model, Schema } from "mongoose";
 import {
   ICertificate,
+  ILocation,
   IMechanicProfile,
   IWorkingHour,
 } from "./mechanicProfile.interface";
-import { model, Schema } from "mongoose";
 
-const WorkingHourSchema = new Schema<IWorkingHour>(
-  {
-    start: {
-      type: String,
-    },
-    end: {
-      type: String,
-    },
-  },
-  {
-    _id: false,
-  }
-);
+const WorkingHourSchema = new Schema<IWorkingHour>({
+  start: { type: String, required: true },
+  end: { type: String, required: true },
+});
 
-// Certificate Schema
-const CertificateSchema = new Schema<ICertificate>(
-  {
-    institutionName: {
-      type: String,
-    },
-    startTime: {
-      type: String,
-    },
-    endTime: {
-      type: String,
-    },
-  },
-  {
-    _id: false,
-  }
-);
+const CertificateSchema = new Schema<ICertificate>({
+  institutionName: { type: String, required: true },
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
+});
 
-// MechanicProfile Schema
-// MechanicProfile Schema
+const LocationSchema = new Schema<ILocation>({
+  apartmentNo: { type: String, required: true },
+  roadNo: { type: String, required: true },
+  state: { type: String, required: true },
+  city: { type: String, required: true },
+  zipCode: { type: String, required: true },
+  address: { type: String, required: true },
+  country: { type: String, required: true },
+});
+
 const MechanicProfileSchema = new Schema<IMechanicProfile>(
   {
-    fullName: {
-      type: String,
-    },
-    email: {
-      type: String,
-    },
-    workshopName: {
-      type: String,
-    },
-    location: {
-      country: { type: String },
-      apartmentNo: {
-        type: String,
-      },
-      roadNo: {
-        type: String,
-      },
-      state: {
-        type: String,
-      },
-      city: {
-        type: String,
-      },
-      zipCode: {
-        type: String,
-      },
-      address: {
-        type: String,
-      },
-      coordinates: {
-        type: { type: String, enum: ["Point"] }, // 'Point' is the type
+    fullName: { type: String, required: true },
+    email: { type: String, required: true },
+    location: { type: LocationSchema, required: true },
+    phoneNumber: { type: String, required: true },
+    image: { type: String, required: true },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    stripeAccountId: { type: String, required: true },
+    workshop: {
+      name: { type: String, required: true },
+      workingHours: { type: WorkingHourSchema, required: true },
+      services: [{ type: String }],
+      location: {
+        name: { type: String, required: true },
+        placeId: { type: String, required: true },
         coordinates: {
-          type: [Number], // Array of numbers (longitude, latitude)
+          type: {
+            type: String,
+            enum: ["Point"],
+            required: true,
+          },
+          coordinates: {
+            type: [Number],
+            required: true,
+          },
         },
       },
     },
-    phoneNumber: {
-      type: String,
-    },
-    workingHours: {
-      type: WorkingHourSchema,
-    },
-    services: {
-      type: [String],
-      default: [], // array of strings
-    },
-    experience: {
-      type: [String],
-      default: [], // array of experiences
-    },
-    certificates: {
-      type: [CertificateSchema],
-      default: [], // array of certificates
-    },
-    image: { type: String },
-    user: { type: Schema.Types.ObjectId, required: true, ref: "User" },
-    stripeAccountId: { type: String },
+    experience: [{ type: String }],
+    certificates: [CertificateSchema],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 // Add a 2dsphere index to the coordinates field

@@ -1,5 +1,22 @@
 import { Types } from "mongoose";
-import { ILocation } from "../mechanicProfile/mechanicProfile.interface";
+
+export interface ILocation {
+  apartmentNo: string;
+  roadNo: string;
+  state: string;
+  city: string;
+  zipCode: string;
+  address: string;
+  country: string;
+}
+
+export interface ICarInfo {
+  carName: string;
+  carModel: string;
+  vinCode: string;
+  licensePlate: string;
+  tagNumber: string;
+}
 
 export interface IUserProfile {
   fullName: string;
@@ -10,11 +27,5 @@ export interface IUserProfile {
   location?: ILocation;
   image?: string;
   user: Types.ObjectId;
-  carInfo: {
-    carName: string;
-    carModel: string;
-    vinCode: string;
-    licensePlate: string;
-    tagNumber: string;
-  };
+  carInfo: ICarInfo;
 }

@@ -19,23 +19,31 @@ export interface ILocation {
   zipCode: string;
   address: string;
   country: string;
-  coordinates: {
-    type: "Point";
-    coordinates: number[];
-  }; // [longitude, latitude]
 }
 
 export interface IMechanicProfile {
   fullName: string;
   email: string;
-  workshopName: string;
   location: ILocation;
   phoneNumber: string;
-  workingHours: IWorkingHour;
-  services: string[];
-  experience: string[];
-  certificates: ICertificate[];
   image: string;
   user: Types.ObjectId;
   stripeAccountId: string;
+  workshop: IWorkshop;
+  experience: string[];
+  certificates: ICertificate[];
+}
+
+export interface IWorkshop {
+  name: string;
+  workingHours: IWorkingHour;
+  services: string[];
+  location: {
+    name: string;
+    placeId: string;
+    coordinates: {
+      type: "Point";
+      coordinates: number[];
+    }; // [longitude, latitude]
+  };
 }

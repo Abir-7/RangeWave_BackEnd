@@ -5,6 +5,13 @@ export interface IService {
   description: string;
   user: Types.ObjectId;
   status: Status;
+  location: {
+    placeId: string;
+    coordinates: {
+      type: "Point";
+      coordinates: number[];
+    }; // [longitude, latitude]
+  };
   cancelReson: CancelReason;
 }
 

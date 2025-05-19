@@ -19,6 +19,17 @@ const serviceSchema = new Schema<IService>(
         return this.status === Status.CANCELLED; // Only required if status is 'cancel'
       },
     },
+    location: {
+      placeId: {
+        type: String,
+      },
+      coordinates: {
+        type: { type: String, enum: ["Point"] }, // 'Point' is the type
+        coordinates: {
+          type: [Number], // Array of numbers (longitude, latitude)
+        },
+      },
+    },
   },
   { timestamps: true }
 );

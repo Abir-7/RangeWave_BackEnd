@@ -6,6 +6,7 @@ import {
   ILocation,
   IMechanicProfile,
   IWorkingHour,
+  IWorkshop,
 } from "./mechanicProfile.interface";
 import { MechanicProfile } from "./mechanicProfile.model";
 import { removeFalsyFields } from "../../../utils/helper/removeFalsyField";
@@ -28,16 +29,9 @@ const updateMechanicProfile = async (
       throw new AppError(status.NOT_FOUND, "Mechanic profile not found");
     }
 
-    const {
-      certificates,
-      experience,
-      location,
-      phoneNumber,
-      workshopName,
-      workingHours,
-      fullName,
-      services,
-    } = data;
+    const { certificates, experience, phoneNumber, workshop, fullName } = data;
+
+    const { location, name, services, workingHours } = workshop as IWorkshop;
 
     if (location && Object.keys(location).length > 0) {
       const { coordinates, ...other } = location;
@@ -49,7 +43,7 @@ const updateMechanicProfile = async (
       }
 
       if (coordinates?.coordinates.length === 2) {
-        mechanicProfile.location.coordinates.coordinates =
+        mechanicProfile.workshop.location.coordinates.coordinates =
           coordinates.coordinates;
       }
     }
@@ -63,15 +57,15 @@ const updateMechanicProfile = async (
     }
 
     if (services && services.length > 0) {
-      mechanicProfile.services = services;
+      mechanicProfile.workshop.services = services;
     }
 
     if (phoneNumber) {
       mechanicProfile.phoneNumber = phoneNumber;
     }
 
-    if (workshopName) {
-      mechanicProfile.workshopName = workshopName;
+    if (name) {
+      mechanicProfile.workshop.name = name;
     }
 
     if (fullName) {
@@ -81,7 +75,7 @@ const updateMechanicProfile = async (
     if (workingHours && Object.keys(workingHours).length > 0) {
       const newData = removeFalsyFields(workingHours as any);
       for (const field in newData) {
-        mechanicProfile.workingHours[field as keyof IWorkingHour] =
+        mechanicProfile.workshop.workingHours[field as keyof IWorkingHour] =
           newData[field];
       }
     }

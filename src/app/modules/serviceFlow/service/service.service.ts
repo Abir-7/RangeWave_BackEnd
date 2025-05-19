@@ -9,9 +9,24 @@ import MechanicRating from "../../rating/mechanicRating/mechanicRating.model";
 import { IMechanicProfile } from "../../users/mechanicProfile/mechanicProfile.interface";
 
 const addServiceReq = async (
-  serviceData: Partial<IService>,
+  serviceData: {
+    issue: string;
+    description: string;
+    location: {
+      placeId: string;
+      coordinates: number[];
+    };
+  },
   userId: string
 ): Promise<IService> => {
+  const location = {
+    placeId: serviceData.location.placeId,
+    coordinates: {
+      type: "Point",
+      coordinates: serviceData.location.coordinates,
+    },
+  };
+
   const today = new Date();
   // Set time range for today (start and end)
   const startOfDay = new Date(today.setHours(0, 0, 0, 0));
@@ -31,7 +46,11 @@ const addServiceReq = async (
   }
 
   // If no conflict, create the new service
-  const service = await Service.create({ ...serviceData, user: userId });
+  const service = await Service.create({
+    ...serviceData,
+    user: userId,
+    location,
+  });
   return service;
 };
 const getDistance = (
@@ -155,7 +174,6 @@ const hireMechanic = async (bidId: string, userId: string) => {
   if (!bidData) {
     throw new Error("Bid not found");
   }
-  console.log(bidData.reqServiceId);
 
   const serviceData = await Service.findOne({
     _id: bidData.reqServiceId._id,
@@ -201,87 +219,6 @@ const seeServiceDetails = async (sId: string): Promise<IService> => {
     throw new Error("Service not found");
   }
   return service;
-};
-
-// for socket-------------------
-export const sendBidToUser = async (
-  serviceId: string,
-  userId: string,
-  mechanicId: string
-) => {
-  // Find the service with the specific serviceId and userId
-  const service = await Service.findOne({
-    _id: serviceId,
-    status: Status.FINDING,
-    user: userId,
-  });
-
-  if (!service) {
-    throw new Error("Service not found");
-  }
-
-  // Fetch the user profile and check for location data
-  const userProfile = await UserProfile.findOne({ user: userId });
-
-  if (!userProfile || !userProfile.location?.coordinates.coordinates) {
-    throw new Error("User location not found");
-  }
-
-  // Find the bid made by the specific mechanic
-  const bid = await Bid.findOne({
-    reqServiceId: serviceId,
-    mechanicId: mechanicId,
-    status: BidStatus.provided,
-  });
-
-  if (!bid) {
-    throw new Error("No bid found for the specified mechanic");
-  }
-
-  // Get the mechanic's rating
-  const mechanicRating = await MechanicRating.aggregate([
-    { $match: { mechanicId: mechanicId } },
-    {
-      $group: {
-        _id: "$mechanicId",
-        avgRating: { $avg: "$rating" },
-      },
-    },
-  ]);
-
-  const mechanicRatingMap =
-    mechanicRating.length > 0 ? mechanicRating[0].avgRating : 0;
-
-  // Fetch mechanic profile details
-  const mechanicProfile = await MechanicProfile.findOne({
-    user: bid.mechanicId,
-  });
-
-  if (!mechanicProfile || !mechanicProfile.location?.coordinates) {
-    throw new Error("Mechanic location not found");
-  }
-
-  // Calculate the distance
-  const distance = getDistance(
-    (userProfile.location?.coordinates.coordinates as [number, number]) || [
-      0, 0,
-    ],
-    mechanicProfile.location.coordinates.coordinates as [number, number]
-  );
-
-  // Return the bid with additional details
-  return {
-    ...bid.toObject(),
-    mechanicProfile: {
-      user: mechanicProfile.user,
-      fullName: mechanicProfile.fullName,
-      image: mechanicProfile.image,
-      phoneNumber: mechanicProfile.phoneNumber,
-      email: mechanicProfile.email,
-    },
-    avgRating: mechanicRatingMap,
-    distance,
-  };
 };
 
 export const ServiceService = {
