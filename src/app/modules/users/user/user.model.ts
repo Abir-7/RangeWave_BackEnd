@@ -5,6 +5,7 @@ import { IUser } from "./user.interface";
 import { userRole } from "../../../interface/auth.interface";
 
 import bcrypt from "bcryptjs";
+
 const userSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false },

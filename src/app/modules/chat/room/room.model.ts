@@ -1,19 +1,19 @@
-import mongoose, { Schema, Document, Model } from "mongoose";
-
-export interface IChatRoom extends Document {
-  users: [string, string]; // Exactly two user IDs
-}
+import mongoose, { Schema, Model } from "mongoose";
+import { IChatRoom } from "./room.interface";
 
 const ChatRoomSchema: Schema<IChatRoom> = new Schema(
   {
     users: {
-      type: [String],
+      type: [Schema.Types.ObjectId],
       required: true,
+      ref: "User",
       validate: {
         validator: (arr: string[]) => arr.length === 2,
         message: "Users array must contain exactly two user IDs",
       },
     },
+
+    lastMessage: { type: Schema.Types.ObjectId, ref: "Message" },
   },
   {
     timestamps: true,

@@ -4,6 +4,7 @@ import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 import { BidStatus } from "../bid/bid.interface";
 import { StripeService } from "../../stripe/stripe.service";
+import { createRoomAfterHire } from "../../chat/room/room.service";
 
 const addServiceReq = async (
   serviceData: {
@@ -173,44 +174,75 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 };
 
 // call payment intent function from stripe.service.ts file
+import mongoose from "mongoose";
+
 const hireMechanic = async (bidId: string, userId: string) => {
-  const bidData = await Bid.findOne({
-    _id: bidId,
-    status: BidStatus.provided,
-  })
-    .populate("reqServiceId")
-    .lean();
+  const session = await mongoose.startSession();
 
-  if (!bidData) {
-    throw new Error("Bid not found");
-  }
+  try {
+    session.startTransaction();
 
-  const serviceData = await Service.findOne({
-    _id: bidData.reqServiceId._id,
-    user: userId,
-  });
+    // Find the bid inside the transaction session
+    const bidData = await Bid.findOne({
+      _id: bidId,
+      status: BidStatus.provided,
+    })
+      .populate("reqServiceId")
+      .session(session) // <-- important to include session
+      .lean();
 
-  if (serviceData?.status !== Status.FINDING) {
-    throw new Error("Service not found.");
-  }
+    if (!bidData) {
+      throw new Error("Bid not found");
+    }
 
-  serviceData.status = Status.UNPAID;
-  await serviceData.save();
+    // Find the service with session
+    const serviceData = await Service.findOne({
+      _id: bidData.reqServiceId._id,
+      user: userId,
+    }).session(session);
 
-  const paymentIntent = await StripeService.createPaymentIntent(bidId);
+    if (!serviceData || serviceData.status !== Status.FINDING) {
+      throw new Error("Service not found.");
+    }
 
-  return {
-    ...bidData,
-    reqServiceId: {
-      ...serviceData.toObject(),
-      location: {
-        coordinates: serviceData.location.coordinates.coordinates,
-        placeId: serviceData.location.placeId,
+    // Update the service status inside transaction
+    serviceData.status = Status.UNPAID;
+    await serviceData.save({ session });
+
+    // Create the room inside transaction - you need to support session in RoomService
+    const users = [userId.toString(), bidData.mechanicId.toString()] as [
+      string,
+      string
+    ];
+
+    // Assuming you modify createRoom to accept session or it internally uses session
+    await createRoomAfterHire(users, session);
+
+    // Commit the transaction before calling external payment
+    await session.commitTransaction();
+    session.endSession();
+
+    // Call the external Stripe service (outside transaction)
+    const paymentIntent = await StripeService.createPaymentIntent(bidId);
+
+    return {
+      ...bidData,
+      reqServiceId: {
+        ...serviceData.toObject(),
+        location: {
+          coordinates: serviceData.location.coordinates.coordinates,
+          placeId: serviceData.location.placeId,
+        },
       },
-    },
-    paymentIntent,
-  };
+      paymentIntent,
+    };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
+
 const cancelService = async (
   id: string,
   serviceData: Partial<IService>

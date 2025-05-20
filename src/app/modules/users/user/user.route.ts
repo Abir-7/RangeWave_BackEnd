@@ -13,4 +13,10 @@ router.patch(
   UserController.updateProfileImage
 );
 
+router.get(
+  "/me",
+  auth("ADMIN", "MECHANIC", "USER"),
+  UserController.getProfileData
+);
+
 export const UserRoute = router;

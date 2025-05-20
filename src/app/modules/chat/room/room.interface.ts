@@ -1,4 +1,7 @@
+import { Types } from "mongoose";
+
 export interface IChatRoom {
-  users: [string, string];
+  users: Types.ObjectId[];
   _id: string;
+  lastMessage: Types.ObjectId;
 }

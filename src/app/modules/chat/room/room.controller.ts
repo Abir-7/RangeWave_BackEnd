@@ -13,6 +13,17 @@ const createRoom = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getChatList = catchAsync(async (req: Request, res: Response) => {
+  const result = await RoomService.getChatList(req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Chat list fetched successfully",
+    data: result,
+  });
+});
+
 export const RoomController = {
   createRoom,
+  getChatList,
 };
