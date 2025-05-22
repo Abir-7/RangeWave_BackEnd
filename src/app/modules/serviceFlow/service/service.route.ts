@@ -24,6 +24,17 @@ router.get(
   ServiceController.seeServiceDetails
 );
 
+router.post(
+  "/req-for-extra-work/:sId",
+  auth("MECHANIC"),
+  ServiceController.reqForExtraWork
+);
+
 //for both
+router.get(
+  "/get-running-service",
+  auth("MECHANIC", "USER"),
+  ServiceController.getRunningService
+);
 
 export const ServiceRoute = router;

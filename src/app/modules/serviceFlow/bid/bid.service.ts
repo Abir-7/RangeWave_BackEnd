@@ -1,9 +1,10 @@
 import status from "http-status";
 import AppError from "../../../errors/AppError";
-import Service from "../service/service.model";
+
 import { BidStatus, IBid } from "./bid.interface";
 import Bid from "./bid.model";
 import { Status } from "../service/service.interface";
+import { Service } from "../service/service.model";
 
 const addBid = async (
   bidData: { price: number; reqServiceId: string },

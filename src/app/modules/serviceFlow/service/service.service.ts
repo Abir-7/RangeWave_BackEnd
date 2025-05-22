@@ -1,10 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import mongoose from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import Service from "./service.model";
+import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 import { BidStatus } from "../bid/bid.interface";
 import { StripeService } from "../../stripe/stripe.service";
 import { createRoomAfterHire } from "../../chat/room/room.service";
+
+// ------------------------------------for users-------------------------------//
 
 const addServiceReq = async (
   serviceData: {
@@ -55,8 +60,6 @@ const calculateDistance = (
   coords1: [number, number],
   coords2: [number, number]
 ): number => {
-  console.log(coords1, coords2);
-
   const R = 6371; // km
 
   const [lon1, lat1] = coords1;
@@ -174,7 +177,9 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 };
 
 // call payment intent function from stripe.service.ts file
-import mongoose from "mongoose";
+import AppError from "../../../errors/AppError";
+import status from "http-status";
+import User from "../../users/user/user.model";
 
 const hireMechanic = async (bidId: string, userId: string) => {
   const session = await mongoose.startSession();
@@ -256,7 +261,110 @@ const cancelService = async (
   return service;
 };
 
-// for mechanics
+// ------------------------------------for mechanics and users-------------------------------//
+
+const getRunningService = async (userId: string) => {
+  const activeStatuses = [Status.FINDING, Status.WORKING, Status.WAITING];
+
+  const userData = await User.findById(userId).lean();
+  if (userData && userData.role === "USER") {
+    const service = await Service.findOne({
+      user: userId,
+      status: { $in: activeStatuses },
+    })
+      .populate("extraWork")
+      .populate({
+        path: "user",
+        model: "UserProfile",
+        foreignField: "user",
+        select: "fullName email -_id image",
+      })
+      .select("status issue location description")
+      .lean();
+
+    if (!service) {
+      throw new Error("Service not found");
+    }
+
+    const bidData = (await Bid.findOne({ reqServiceId: service._id })
+      .populate({
+        path: "mechanicId",
+        model: "MechanicProfile",
+        foreignField: "user",
+        select: "fullName email image workshop.location",
+      })
+      .lean()) as any;
+
+    const location =
+      bidData?.mechanicId.workshop.location.coordinates.coordinates;
+    const { workshop, ...other } = bidData.mechanicId;
+    return {
+      ...service,
+      price: bidData?.price,
+      mechanicProfile: {
+        ...other,
+        location: location,
+      },
+    };
+  } else if (userData && userData?.role === "MECHANIC") {
+    const bidData = (await Bid.findOne(
+      {
+        mechanicId: userId,
+      },
+      { price: 1, status: 1, reqServiceId: 1 }
+    ) // only needed bid fields
+      .populate({
+        path: "reqServiceId",
+        match: { status: { $in: [Status.WORKING, Status.WAITING] } },
+        select: "status issue location description",
+        populate: [
+          {
+            path: "extraWork",
+            select: "issue description price status",
+            options: { lean: true },
+          },
+          {
+            path: "user",
+            model: "UserProfile",
+            foreignField: "user",
+            select: "fullName -_id image email user",
+            options: { lean: true },
+          }, // adjust user fields as needed
+        ],
+        options: { lean: true }, // populate with lean for performance
+      })
+      .populate({
+        path: "mechanicId",
+        model: "MechanicProfile",
+        foreignField: "user",
+        select: "fullName -_id email workshop image",
+      })
+      .lean() // make the main query lean
+      .exec()) as any;
+
+    console.log(bidData);
+
+    if (bidData && bidData.reqServiceId._id) {
+      const location =
+        bidData?.mechanicId.workshop.location.coordinates.coordinates;
+      const { workshop, ...other } = bidData.mechanicId;
+
+      return {
+        ...bidData.reqServiceId,
+        price: bidData.price,
+        mechanicProfile: {
+          ...other,
+          location: location,
+        },
+      };
+    }
+    return null;
+  } else {
+    return null;
+  }
+};
+
+// ------------------------------------for mechanics-------------------------------//
 const seeServiceDetails = async (sId: string) => {
   const service = await Service.findById(sId)
     .populate({
@@ -284,10 +392,28 @@ const seeServiceDetails = async (sId: string) => {
   };
 };
 
+const reqForExtraWork = async (
+  sId: string,
+  data: {
+    price: number;
+    issue: string;
+    description: string;
+  }
+) => {
+  const serviceData = await Service.findById(sId);
+  if (!serviceData) {
+    throw new AppError(status.NOT_FOUND, "Service not found");
+  }
+  const extraWork = await ExtraWork.create({ ...data, reqServiceId: sId });
+  return extraWork;
+};
+
 export const ServiceService = {
   addServiceReq,
   getBidListOfService,
   hireMechanic,
   cancelService,
   seeServiceDetails,
+  reqForExtraWork,
+  getRunningService,
 };

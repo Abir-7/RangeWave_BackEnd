@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import catchAsync from "../../../utils/catchAsync";
 import sendResponse from "../../../utils/sendResponse";
 import { ServiceService } from "./service.service";
-
+//--------------------------------- For Users -----------------------------------------//
 const addServiceReq = catchAsync(async (req: Request, res: Response) => {
   const serviceData = req.body;
   const result = await ServiceService.addServiceReq(
@@ -50,12 +50,33 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+//-------------------------------- For Both Mechanics and Users-------------------------------------------//
+const getRunningService = catchAsync(async (req: Request, res: Response) => {
+  const result = await ServiceService.getRunningService(req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Current Service data is fetched successfully",
+    data: result,
+  });
+});
+//--------------------------------- For Mechanics -----------------------------------------//
 
-// for mechanics
 const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
   const { sId } = req.params;
 
   const result = await ServiceService.seeServiceDetails(sId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Service details is fetched successfully",
+    data: result,
+  });
+});
+const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
+  const { sId } = req.params;
+
+  const result = await ServiceService.reqForExtraWork(sId, req.body);
   sendResponse(res, {
     success: true,
     statusCode: 200,
@@ -70,4 +91,6 @@ export const ServiceController = {
   hireMechanic,
   cancelService,
   seeServiceDetails,
+  reqForExtraWork,
+  getRunningService,
 };

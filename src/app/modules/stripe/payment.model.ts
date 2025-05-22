@@ -11,6 +11,14 @@ const paymentSchema: Schema<IPayment> = new Schema(
       default: PaymentStatus.UNPAID,
       required: true,
     },
+    extraPay: {
+      work: {
+        type: Schema.Types.ObjectId,
+        ref: "ExtraWork",
+        default: null,
+      },
+      txId: { type: Schema.Types.ObjectId, default: null },
+    },
   },
   {
     timestamps: true, // adds createdAt and updatedAt

@@ -10,10 +10,11 @@ import { stripe } from "./stripe";
 import { decrypt, encrypt } from "../../utils/helper/encrypt&decrypt";
 import { appConfig } from "../../config";
 import Bid from "../serviceFlow/bid/bid.model";
-import Service from "../serviceFlow/service/service.model";
+
 import { Status } from "../serviceFlow/service/service.interface";
 import Payment from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
+import { Service } from "../serviceFlow/service/service.model";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({

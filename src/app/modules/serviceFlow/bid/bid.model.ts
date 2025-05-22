@@ -7,6 +7,7 @@ const BidSchema = new Schema<IBid>(
       type: Number,
       required: true,
     },
+
     reqServiceId: {
       type: Schema.Types.ObjectId,
       ref: "Service", // Assuming you have a ServiceRequest model
@@ -27,5 +28,5 @@ const BidSchema = new Schema<IBid>(
 
 // Mongoose Model
 const Bid = model<IBid>("Bid", BidSchema);
-
+BidSchema.index({ mechanicId: 1 });
 export default Bid;
