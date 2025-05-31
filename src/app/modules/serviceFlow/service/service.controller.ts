@@ -62,6 +62,17 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
 });
 //--------------------------------- For Mechanics -----------------------------------------//
 
+const getAllRequestedService = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await ServiceService.getAllRequestedService();
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Service req list is fetched successfully",
+      data: result,
+    });
+  }
+);
 const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
   const { sId } = req.params;
 
@@ -93,4 +104,5 @@ export const ServiceController = {
   seeServiceDetails,
   reqForExtraWork,
   getRunningService,
+  getAllRequestedService,
 };

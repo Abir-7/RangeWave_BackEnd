@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose from "mongoose";
+import mongoose, { PipelineStage } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
@@ -54,8 +54,16 @@ const addServiceReq = async (
     user: userId,
     location,
   });
+
+  const io = getSocket();
+
+  //socket-emit
+  io.emit("req-list", service);
+
   return service;
 };
+
+//helper function
 const calculateDistance = (
   coords1: [number, number],
   coords2: [number, number]
@@ -180,6 +188,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 import AppError from "../../../errors/AppError";
 import status from "http-status";
 import User from "../../users/user/user.model";
+import { getSocket } from "../../../socket/socket";
 
 const hireMechanic = async (bidId: string, userId: string) => {
   const session = await mongoose.startSession();
@@ -263,6 +272,36 @@ const cancelService = async (
 
 // ------------------------------------for mechanics and users-------------------------------//
 
+const getAllRequestedService = async () => {
+  const aggregateArray: PipelineStage[] = [
+    {
+      $match: {
+        status: Status.FINDING,
+      },
+    },
+    {
+      $lookup: {
+        from: "bids",
+        let: { serviceId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
+              status: { $ne: "declined" },
+            },
+          },
+        ],
+        as: "bid",
+      },
+    },
+    {
+      $project: { bid: 0 },
+    },
+  ];
+
+  const data = await Service.aggregate(aggregateArray);
+  return data;
+};
 const getRunningService = async (userId: string) => {
   const activeStatuses = [Status.FINDING, Status.WORKING, Status.WAITING];
 
@@ -416,4 +455,5 @@ export const ServiceService = {
   seeServiceDetails,
   reqForExtraWork,
   getRunningService,
+  getAllRequestedService,
 };

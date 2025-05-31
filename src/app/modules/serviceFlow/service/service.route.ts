@@ -18,6 +18,13 @@ router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
 router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
 
 //for mechanics
+
+router.get(
+  "/get-requested-service-list",
+  auth("MECHANIC"),
+  ServiceController.getAllRequestedService
+);
+
 router.get(
   "/see-details/:sId",
   auth("MECHANIC"),
