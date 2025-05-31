@@ -270,7 +270,7 @@ const cancelService = async (
   return service;
 };
 
-// ------------------------------------for mechanics and users-------------------------------//
+// ---------------------------------for mechanics and users-------------------------------//
 
 const getAllRequestedService = async () => {
   const aggregateArray: PipelineStage[] = [
