@@ -22,6 +22,10 @@ const serviceSchema = new Schema<IService>(
       enum: [...Object.values(Status)],
       default: Status.FINDING,
     },
+    isStatusAccepted: {
+      type: Boolean,
+      default: null,
+    },
     cancelReson: {
       type: String,
 

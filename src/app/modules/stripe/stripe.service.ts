@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../errors/AppError";
@@ -137,8 +137,13 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
   }
 };
 
-const refundPayment = async (bidId: string) => {
-  const bidData = await Payment.findOne({ bidId: bidId });
+const refundPayment = async (
+  bidId: string | Types.ObjectId,
+  session?: mongoose.ClientSession
+) => {
+  const bidData = await Payment.findOne({ bidId: bidId }).session(
+    session ?? null
+  );
 
   if (!bidData || !bidData.txId) {
     throw new AppError(status.BAD_REQUEST, "txId not found.");
@@ -148,19 +153,19 @@ const refundPayment = async (bidId: string) => {
     payment_intent: bidData.txId,
   });
 
-  // Check refund status
   if (refund.status !== "succeeded") {
     throw new AppError(
       status.INTERNAL_SERVER_ERROR,
       "Refund not successful, status: " + refund.status
     );
   }
-  // Optionally update your DB here to mark payment as refunded
+
   bidData.status = PaymentStatus.REFUNDED;
-  await bidData.save();
+  await bidData.save({ session });
 
   return refund;
 };
+
 // const getExpressAccountLoginLink = async (userId: string) => {
 //   const userData = await MechanicProfile.findOne({ user: userId });
 

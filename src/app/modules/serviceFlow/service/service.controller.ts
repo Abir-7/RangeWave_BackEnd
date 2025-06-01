@@ -39,24 +39,40 @@ const hireMechanic = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const cancelService = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const serviceData = req.body;
-  const result = await ServiceService.cancelService(id, serviceData);
-  sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: "Service updated successfully",
-    data: result,
-  });
-});
+const markServiceAsComplete = catchAsync(
+  async (req: Request, res: Response) => {
+    const { sId } = req.params;
+    console.log(sId);
+    const result = await ServiceService.markServiceAsComplete(sId);
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Mark as completed.",
+      data: result,
+    });
+  }
+);
+
 //-------------------------------- For Both Mechanics and Users-------------------------------------------//
+
 const getRunningService = catchAsync(async (req: Request, res: Response) => {
   const result = await ServiceService.getRunningService(req.user.userId);
   sendResponse(res, {
     success: true,
     statusCode: 200,
     message: "Current Service data is fetched successfully",
+    data: result,
+  });
+});
+
+const cancelService = catchAsync(async (req: Request, res: Response) => {
+  const { sId } = req.params;
+  const serviceData = req.body;
+  const result = await ServiceService.cancelService(sId, serviceData);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Service updated successfully",
     data: result,
   });
 });
@@ -84,6 +100,19 @@ const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
+const changeServiceStatus = catchAsync(async (req: Request, res: Response) => {
+  const { bId } = req.params;
+
+  const result = await ServiceService.changeServiceStatus(bId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Service status is changed successfully",
+    data: result,
+  });
+});
+
 const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
   const { sId } = req.params;
 
@@ -96,13 +125,50 @@ const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+//for socket
+const pushNewServiceReq = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const result = await ServiceService.pushNewServiceReq(id);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "new service request is fetched.",
+    data: result,
+  });
+});
+
+const addNewBidDataToService = catchAsync(
+  async (req: Request, res: Response) => {
+    const { sId, bId } = req.params;
+    const result = await ServiceService.addNewBidDataToService(
+      sId,
+      req.user.userId,
+      bId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "new bid data is fetch for the service",
+      data: result,
+    });
+  }
+);
+
 export const ServiceController = {
   addServiceReq,
   getBidListOfService,
   hireMechanic,
   cancelService,
+
   seeServiceDetails,
   reqForExtraWork,
+
   getRunningService,
   getAllRequestedService,
+
+  pushNewServiceReq,
+  addNewBidDataToService,
+  changeServiceStatus,
+  markServiceAsComplete,
 };

@@ -32,12 +32,13 @@ const addBid = async (
     throw new AppError(status.BAD_REQUEST, "You already add bid.");
   }
 
-  const service = await Bid.create({
+  const saveBid = await Bid.create({
     ...bidData,
     mechanicId: userId,
     status: BidStatus.provided,
   });
-  return service;
+
+  return saveBid;
 };
 
 const declinedBid = async (

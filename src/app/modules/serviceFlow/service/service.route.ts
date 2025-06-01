@@ -4,7 +4,8 @@ import { auth } from "../../../middleware/auth/auth";
 
 const router = Router();
 
-//for user only
+//-------------------------------------for user only
+
 router.post("/req-for-help", auth("USER"), ServiceController.addServiceReq);
 
 router.get(
@@ -14,10 +15,13 @@ router.get(
 );
 
 router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
+router.patch(
+  "/mark-service-as-complete/:sId",
+  auth("USER"),
+  ServiceController.markServiceAsComplete
+);
 
-router.patch("/cancel/:id", auth("USER"), ServiceController.cancelService);
-
-//for mechanics
+//-----------------------------------------for mechanics
 
 router.get(
   "/get-requested-service-list",
@@ -31,17 +35,46 @@ router.get(
   ServiceController.seeServiceDetails
 );
 
+router.patch(
+  "/change-service-status/:bId",
+  auth("MECHANIC"),
+  ServiceController.changeServiceStatus
+);
+
 router.post(
   "/req-for-extra-work/:sId",
   auth("MECHANIC"),
   ServiceController.reqForExtraWork
 );
 
-//for both
+//---------------------------------------------for both
 router.get(
   "/get-running-service",
   auth("MECHANIC", "USER"),
   ServiceController.getRunningService
+);
+
+router.patch(
+  "/cencel-service/:sId",
+  auth("USER", "MECHANIC"),
+  ServiceController.cancelService
+);
+
+//-----------------------------------------------SOCKET----------------------------------------------------------
+
+//---------------------mechanic-------------
+
+router.get(
+  "/push-new-service-req/:id",
+  auth("MECHANIC"),
+  ServiceController.pushNewServiceReq
+);
+
+//---------------------user----------------
+router.get(
+  "/push-new-bid-in-service-req/:sId/:bId",
+  auth("USER"),
+  ServiceController.addNewBidDataToService
 );
 
 export const ServiceRoute = router;

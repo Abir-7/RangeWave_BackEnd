@@ -8,6 +8,11 @@ import Bid from "../bid/bid.model";
 import { BidStatus } from "../bid/bid.interface";
 import { StripeService } from "../../stripe/stripe.service";
 import { createRoomAfterHire } from "../../chat/room/room.service";
+import User from "../../users/user/user.model";
+import AppError from "../../../errors/AppError";
+import status from "http-status";
+import { getSocket } from "../../../socket/socket";
+import Payment from "../../stripe/payment.model";
 
 // ------------------------------------for users-------------------------------//
 
@@ -58,7 +63,7 @@ const addServiceReq = async (
   const io = getSocket();
 
   //socket-emit
-  io.emit("req-list", service);
+  io.emit("new-service", { newServiceId: service._id });
 
   return service;
 };
@@ -121,6 +126,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
     { $unwind: "$mechanicProfile" },
 
     // Step 2: Join Mechanic Ratings (all ratings of that mechanic)
+
     {
       $lookup: {
         from: "mechanicratings",
@@ -166,9 +172,8 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
   // Step 5: Add distance in Node.js (still more efficient this way)
   return bids.map((bid) => {
-    const coords =
-      bid.mechanicProfile?.workshop?.location?.coordinates?.coordinates;
-
+    const coords = bid.mechanicProfile?.workshop.location.coordinates;
+    console.log(coords);
     const distance = coords
       ? calculateDistance(
           service.location.coordinates.coordinates as [number, number],
@@ -178,17 +183,12 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
     return {
       ...bid,
-
       distance: distance ? parseFloat(distance.toFixed(2)) : null,
     };
   });
 };
 
 // call payment intent function from stripe.service.ts file
-import AppError from "../../../errors/AppError";
-import status from "http-status";
-import User from "../../users/user/user.model";
-import { getSocket } from "../../../socket/socket";
 
 const hireMechanic = async (bidId: string, userId: string) => {
   const session = await mongoose.startSession();
@@ -261,47 +261,69 @@ const cancelService = async (
   id: string,
   serviceData: Partial<IService>
 ): Promise<IService> => {
-  const service = await Service.findByIdAndUpdate(id, serviceData, {
-    new: true,
-  });
-  if (!service) {
-    throw new Error("Service not found");
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    // 1. Update the service document inside the transaction
+    const service = await Service.findByIdAndUpdate(id, serviceData, {
+      new: true,
+      session, // Important: pass session here
+    });
+
+    if (!service) {
+      throw new Error("Service not found");
+    }
+
+    // 2. Find the related bid inside the transaction
+    const bid = await Bid.findOne({ reqServiceId: id }).session(session);
+
+    if (!bid) {
+      throw new Error("Bid data not found");
+    }
+
+    // 3. Call Stripe refund (external system)
+    // Note: This is NOT a DB operation, so it can't be part of the DB transaction
+    await StripeService.refundPayment(bid._id, session);
+
+    // 4. Commit transaction only after refund succeeds
+    await session.commitTransaction();
+    session.endSession();
+
+    return service;
+  } catch (error) {
+    // Rollback on error
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-  return service;
+};
+
+const markServiceAsComplete = async (sId: string) => {
+  const serviceData = await Service.findOne({
+    _id: sId,
+    status: Status.COMPLETED,
+  });
+
+  if (!serviceData) {
+    throw new AppError(status.NOT_FOUND, "Service data not found.");
+  }
+
+  if (serviceData.isStatusAccepted !== false) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Service failed to mark as completed."
+    );
+  }
+
+  serviceData.isStatusAccepted = true;
+
+  return await serviceData.save();
 };
 
 // ---------------------------------for mechanics and users-------------------------------//
 
-const getAllRequestedService = async () => {
-  const aggregateArray: PipelineStage[] = [
-    {
-      $match: {
-        status: Status.FINDING,
-      },
-    },
-    {
-      $lookup: {
-        from: "bids",
-        let: { serviceId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
-              status: { $ne: "declined" },
-            },
-          },
-        ],
-        as: "bid",
-      },
-    },
-    {
-      $project: { bid: 0 },
-    },
-  ];
-
-  const data = await Service.aggregate(aggregateArray);
-  return data;
-};
 const getRunningService = async (userId: string) => {
   const activeStatuses = [Status.FINDING, Status.WORKING, Status.WAITING];
 
@@ -383,7 +405,7 @@ const getRunningService = async (userId: string) => {
 
     console.log(bidData);
 
-    if (bidData && bidData.reqServiceId._id) {
+    if (bidData && bidData?.reqServiceId?._id) {
       const location =
         bidData?.mechanicId.workshop.location.coordinates.coordinates;
       const { workshop, ...other } = bidData.mechanicId;
@@ -404,6 +426,72 @@ const getRunningService = async (userId: string) => {
 };
 
 // ------------------------------------for mechanics-------------------------------//
+
+const getAllRequestedService = async () => {
+  const aggregateArray: PipelineStage[] = [
+    {
+      $match: {
+        status: Status.FINDING,
+      },
+    },
+    {
+      $lookup: {
+        from: "bids",
+        let: { serviceId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
+              status: { $ne: "declined" },
+            },
+          },
+        ],
+        as: "bid",
+      },
+    },
+    {
+      // Reshape the location field here
+      $addFields: {
+        location: {
+          placeId: "$location.placeId",
+          coordinates: "$location.coordinates.coordinates", // extract inner coordinates array
+        },
+      },
+    },
+    {
+      $project: { bid: 0 },
+    },
+  ];
+
+  const data = await Service.aggregate(aggregateArray);
+  return data;
+};
+
+const changeServiceStatus = async (bId: string) => {
+  const bidData = await Bid.findById(bId);
+
+  if (!bidData) {
+    throw new AppError(status.NOT_FOUND, "Bid data not found.");
+  }
+
+  const serviceData = await Service.findById(bidData.reqServiceId);
+
+  if (!serviceData) {
+    throw new AppError(status.NOT_FOUND, "Service data not found.");
+  }
+
+  if (serviceData?.status === Status.WAITING) {
+    serviceData.status = Status.WORKING;
+  } else if (serviceData.status === Status.WORKING) {
+    serviceData.status = Status.COMPLETED;
+    serviceData.isStatusAccepted = false;
+  } else {
+    throw new AppError(status.BAD_REQUEST, "Faild to change service status");
+  }
+
+  return await serviceData.save();
+};
+
 const seeServiceDetails = async (sId: string) => {
   const service = await Service.findById(sId)
     .populate({
@@ -447,6 +535,148 @@ const reqForExtraWork = async (
   return extraWork;
 };
 
+//-------------------------------------------------------------------------------------Api for socket -----------------------------------------------------------------
+
+const pushNewServiceReq = async (serviceId: string) => {
+  const aggregateArray: PipelineStage[] = [
+    {
+      $match: {
+        status: Status.FINDING,
+        _id: new mongoose.Types.ObjectId(serviceId),
+      },
+    },
+    {
+      $lookup: {
+        from: "bids",
+        let: { serviceId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
+              status: { $ne: "declined" },
+            },
+          },
+        ],
+        as: "bid",
+      },
+    },
+    {
+      // Reshape the location field here
+      $addFields: {
+        location: {
+          placeId: "$location.placeId",
+          coordinates: "$location.coordinates.coordinates", // extract inner coordinates array
+        },
+      },
+    },
+    {
+      $project: { bid: 0 },
+    },
+  ];
+
+  const data = await Service.aggregate(aggregateArray);
+  return data[0];
+};
+
+const addNewBidDataToService = async (
+  serviceId: string,
+  userId: string,
+  bidId: string
+) => {
+  const service = await Service.findOne({
+    _id: serviceId,
+    status: Status.FINDING,
+    user: userId,
+  }).lean();
+
+  if (!service || !service.location?.coordinates) {
+    throw new Error("Service not found or missing location");
+  }
+
+  const bids = await Bid.aggregate([
+    {
+      $match: {
+        reqServiceId: service._id,
+        _id: new mongoose.Types.ObjectId(bidId),
+      },
+    },
+
+    // Step 1: Join Mechanic Profile
+    {
+      $lookup: {
+        from: "mechanicprofiles",
+        localField: "mechanicId",
+        foreignField: "user",
+        as: "mechanicProfile",
+      },
+    },
+    { $unwind: "$mechanicProfile" },
+
+    // Step 2: Join Mechanic Ratings (all ratings of that mechanic)
+
+    {
+      $lookup: {
+        from: "mechanicratings",
+        localField: "mechanicId",
+        foreignField: "mechanicId",
+        as: "ratingDocs",
+      },
+    },
+
+    // Step 3: Calculate average rating and count
+    {
+      $addFields: {
+        averageRating: {
+          $cond: [
+            { $gt: [{ $size: "$ratingDocs" }, 0] },
+            {
+              $avg: "$ratingDocs.rating",
+            },
+            0,
+          ],
+        },
+        totalReviews: { $size: "$ratingDocs" },
+      },
+    },
+
+    // Step 4: Project only needed fields
+    {
+      $project: {
+        price: 1,
+        status: 1,
+        mechanicId: 1,
+        averageRating: { $round: ["$averageRating", 1] },
+        totalReviews: 1,
+        "mechanicProfile.fullName": 1,
+        "mechanicProfile.image": 1,
+        "mechanicProfile.workshop.name": 1,
+        "mechanicProfile.workshop.location.placeId": 1,
+        "mechanicProfile.workshop.location.coordinates":
+          "$mechanicProfile.workshop.location.coordinates.coordinates",
+      },
+    },
+  ]);
+
+  // Step 5: Add distance in Node.js (still more efficient this way)
+  const newData = bids.map((bid) => {
+    const coords = bid.mechanicProfile?.workshop.location.coordinates;
+    console.log(coords);
+    const distance = coords
+      ? calculateDistance(
+          service.location.coordinates.coordinates as [number, number],
+          coords
+        )
+      : null;
+
+    return {
+      ...bid,
+      distance: distance ? parseFloat(distance.toFixed(2)) : null,
+    };
+  });
+
+  return newData[0];
+};
+
 export const ServiceService = {
   addServiceReq,
   getBidListOfService,
@@ -456,4 +686,9 @@ export const ServiceService = {
   reqForExtraWork,
   getRunningService,
   getAllRequestedService,
+
+  pushNewServiceReq,
+  addNewBidDataToService,
+  changeServiceStatus,
+  markServiceAsComplete,
 };

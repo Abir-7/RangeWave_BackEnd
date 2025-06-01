@@ -5,6 +5,7 @@ export interface IService {
   description: string;
   user: Types.ObjectId;
   status: Status;
+  isStatusAccepted: boolean;
   location: {
     placeId: string;
     coordinates: {
@@ -19,12 +20,12 @@ export interface IService {
 }
 
 export enum Status {
-  FINDING = "FINDING",
-  WORKING = "WORKING",
-  UNPAID = "UNPAID",
-  WAITING = "WAITING",
-  CANCELLED = "CANCELLED",
-  COMPLETED = "COMPLETED",
+  FINDING = "FINDING", // when
+  WORKING = "WORKING", //when client click start button
+  UNPAID = "UNPAID", // when click on hire button
+  WAITING = "WAITING", //after done payment
+  CANCELLED = "CANCELLED", // when user or mechanic click cencel
+  COMPLETED = "COMPLETED", // after completed service
 }
 
 export enum CancelReason {
