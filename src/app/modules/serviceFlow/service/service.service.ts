@@ -6,7 +6,7 @@ import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 import { BidStatus } from "../bid/bid.interface";
-import { StripeService } from "../../stripe/stripe.service";
+import { payToMechanic, StripeService } from "../../stripe/stripe.service";
 import { createRoomAfterHire } from "../../chat/room/room.service";
 import User from "../../users/user/user.model";
 import AppError from "../../../errors/AppError";
@@ -319,7 +319,9 @@ const markServiceAsComplete = async (sId: string) => {
 
   serviceData.isStatusAccepted = true;
 
-  return await serviceData.save();
+  await serviceData.save();
+  await payToMechanic(serviceData._id);
+  return serviceData;
 };
 
 // ---------------------------------for mechanics and users-------------------------------//

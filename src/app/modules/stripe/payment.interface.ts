@@ -5,6 +5,7 @@ export interface IPayment {
   bidId: Types.ObjectId;
   status: PaymentStatus;
   extraPay: { work: Types.ObjectId; txId: string }; //! todo make function for extrapay
+  transferId: string;
 }
 
 export enum PaymentStatus {
