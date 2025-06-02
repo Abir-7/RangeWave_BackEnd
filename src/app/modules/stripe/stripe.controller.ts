@@ -23,7 +23,7 @@ const createPaymentIntent = catchAsync(async (req: Request, res: Response) => {
 });
 
 const savePaymentData = catchAsync(async (req: Request, res: Response) => {
-  const result = await StripeService.savePaymentData(req.body);
+  const result = await StripeService.savePaymentData(req.body, req.user.userId);
   sendResponse(res, {
     success: true,
     statusCode: 200,

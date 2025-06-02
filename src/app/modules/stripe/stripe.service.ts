@@ -15,6 +15,7 @@ import { Status } from "../serviceFlow/service/service.interface";
 import Payment from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
 import { Service } from "../serviceFlow/service/service.model";
+import { createRoomAfterHire } from "../chat/room/room.service";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
@@ -55,29 +56,27 @@ const createPaymentIntent = async (bidId: string) => {
     throw new AppError(status.NOT_FOUND, "Bid data not found");
   }
 
-  const paymentData = {
-    bidId,
-  };
-  await Payment.create(paymentData);
-
   const convertedAmount = bidData?.price * 100;
   const paymentIntent = await stripe.paymentIntents.create({
     amount: convertedAmount,
     currency: "usd",
     payment_method_types: ["card"],
+    metadata: {
+      bidId,
+    },
   });
 
   return { client_secret: paymentIntent.client_secret };
 };
 
-const savePaymentData = async (data: { txId: string; bidId: string }) => {
+const savePaymentData = async (
+  data: { txId: string; bidId: string },
+  userId: string
+) => {
   const { txId, bidId } = data;
 
   if (!txId || !bidId) {
-    throw new AppError(
-      status.NOT_FOUND,
-      `Give provide ${!txId ? "txId" : "bidId"}`
-    );
+    throw new AppError(status.NOT_FOUND, `provide ${!txId ? "txId" : "bidId"}`);
   }
 
   // Start a session
@@ -105,11 +104,23 @@ const savePaymentData = async (data: { txId: string; bidId: string }) => {
     }
 
     // Update Service status
-    await Service.findOneAndUpdate(
-      { _id: bidData.reqServiceId },
+    const serviceData = await Service.findOneAndUpdate(
+      { _id: bidData.reqServiceId._id },
       { status: Status.WAITING },
       { new: true, session }
     );
+
+    // Assuming you modify createRoom to accept session or it internally uses session
+
+    if (!serviceData) {
+      throw new Error("Service not found.");
+    }
+    const users = [userId.toString(), bidData.mechanicId.toString()] as [
+      string,
+      string
+    ];
+    await createRoomAfterHire(users, session);
+
     const newPaymentData = await Payment.findOneAndUpdate(
       { bidId: bidId },
       { txId, status: PaymentStatus.HOLD },

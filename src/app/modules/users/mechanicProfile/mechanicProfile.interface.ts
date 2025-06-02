@@ -47,5 +47,5 @@ export interface IWorkShopLocation {
   coordinates: {
     type: "Point";
     coordinates: number[];
-  }; // [longitude, latitude]
+  }; //[longitude, latitude]
 }

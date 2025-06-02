@@ -5,6 +5,14 @@ export interface IBid {
   reqServiceId: Types.ObjectId;
   mechanicId: Types.ObjectId;
   status: BidStatus;
+
+  location: {
+    placeId: string;
+    coordinates: {
+      type: "Point";
+      coordinates: number[];
+    };
+  };
 }
 
 export enum BidStatus {

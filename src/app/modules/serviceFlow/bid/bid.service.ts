@@ -7,7 +7,12 @@ import { Status } from "../service/service.interface";
 import { Service } from "../service/service.model";
 
 const addBid = async (
-  bidData: { price: number; reqServiceId: string },
+  bidData: {
+    price: number;
+    reqServiceId: string;
+    coordinates: number;
+    placeId: string;
+  },
   userId: string
 ): Promise<IBid> => {
   const isServiceExist = await Service.findOne({
@@ -33,7 +38,17 @@ const addBid = async (
   }
 
   const saveBid = await Bid.create({
-    ...bidData,
+    price: bidData.price,
+    reqServiceId: bidData.reqServiceId,
+
+    location: {
+      placeId: bidData.placeId,
+      coordinates: {
+        type: "Point",
+        coordinates: bidData.coordinates,
+      },
+    },
+
     mechanicId: userId,
     status: BidStatus.provided,
   });

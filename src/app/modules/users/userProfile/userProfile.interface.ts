@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 
-export interface ILocation {
+export interface IUserLocation {
   apartmentNo: string;
   roadNo: string;
   state: string;
@@ -24,7 +24,7 @@ export interface IUserProfile {
   dateOfBirth?: Date;
   email: string;
   phone?: string;
-  location?: ILocation;
+  location?: IUserLocation;
   image?: string;
   user: Types.ObjectId;
   carInfo: ICarInfo;

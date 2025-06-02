@@ -1,7 +1,7 @@
 import { model, Schema } from "mongoose";
-import { ICarInfo, ILocation, IUserProfile } from "./userProfile.interface";
+import { ICarInfo, IUserLocation, IUserProfile } from "./userProfile.interface";
 
-const LocationSchema = new Schema<ILocation>(
+const LocationSchema = new Schema<IUserLocation>(
   {
     apartmentNo: { type: String },
     roadNo: { type: String },

@@ -13,6 +13,7 @@ import AppError from "../../../errors/AppError";
 import status from "http-status";
 import { getSocket } from "../../../socket/socket";
 import Payment from "../../stripe/payment.model";
+import { PaymentStatus } from "../../stripe/payment.interface";
 
 // ------------------------------------for users-------------------------------//
 
@@ -160,6 +161,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
         mechanicId: 1,
         averageRating: { $round: ["$averageRating", 1] },
         totalReviews: 1,
+        location: 1,
         "mechanicProfile.fullName": 1,
         "mechanicProfile.image": 1,
         "mechanicProfile.workshop.name": 1,
@@ -172,18 +174,19 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
   // Step 5: Add distance in Node.js (still more efficient this way)
   return bids.map((bid) => {
-    const coords = bid.mechanicProfile?.workshop.location.coordinates;
-    console.log(coords);
+    const coords = bid.location?.coordinates?.coordinates;
+    console.log(coords, service.location.coordinates.coordinates);
     const distance = coords
       ? calculateDistance(
           service.location.coordinates.coordinates as [number, number],
           coords
         )
       : null;
-
+    console.log(distance);
     return {
       ...bid,
-      distance: distance ? parseFloat(distance.toFixed(2)) : null,
+      distance:
+        distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
     };
   });
 };
@@ -191,70 +194,26 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 // call payment intent function from stripe.service.ts file
 
 const hireMechanic = async (bidId: string, userId: string) => {
-  const session = await mongoose.startSession();
+  const paymentIntent = await StripeService.createPaymentIntent(bidId);
 
-  try {
-    session.startTransaction();
-
-    // Find the bid inside the transaction session
-    const bidData = await Bid.findOne({
-      _id: bidId,
-      status: BidStatus.provided,
-    })
-      .populate("reqServiceId")
-      .session(session) // <-- important to include session
-      .lean();
-
-    if (!bidData) {
-      throw new Error("Bid not found");
+  if (paymentIntent.client_secret) {
+    const datas = await Payment.findOne({
+      bidId: bidId,
+    });
+    if (!datas) {
+      await Payment.create({
+        bidId: bidId,
+        status: PaymentStatus.UNPAID,
+      });
     }
-
-    // Find the service with session
-    const serviceData = await Service.findOne({
-      _id: bidData.reqServiceId._id,
-      user: userId,
-    }).session(session);
-
-    if (!serviceData || serviceData.status !== Status.FINDING) {
-      throw new Error("Service not found.");
-    }
-
-    // Update the service status inside transaction
-    serviceData.status = Status.UNPAID;
-    await serviceData.save({ session });
-
-    // Create the room inside transaction - you need to support session in RoomService
-    const users = [userId.toString(), bidData.mechanicId.toString()] as [
-      string,
-      string
-    ];
-
-    // Assuming you modify createRoom to accept session or it internally uses session
-    await createRoomAfterHire(users, session);
-
-    // Commit the transaction before calling external payment
-    await session.commitTransaction();
-    session.endSession();
-
-    // Call the external Stripe service (outside transaction)
-    const paymentIntent = await StripeService.createPaymentIntent(bidId);
-
-    return {
-      ...bidData,
-      reqServiceId: {
-        ...serviceData.toObject(),
-        location: {
-          coordinates: serviceData.location.coordinates.coordinates,
-          placeId: serviceData.location.placeId,
-        },
-      },
-      paymentIntent,
-    };
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
+  } else {
+    throw new AppError(status.BAD_REQUEST, "Failed to create client secret.");
   }
+
+  return {
+    bidId,
+    paymentIntent,
+  };
 };
 
 const cancelService = async (

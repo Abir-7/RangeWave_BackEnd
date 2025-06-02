@@ -20,12 +20,11 @@ export interface IService {
 }
 
 export enum Status {
-  FINDING = "FINDING", // when
-  WORKING = "WORKING", //when client click start button
-  UNPAID = "UNPAID", // when click on hire button
-  WAITING = "WAITING", //after done payment
-  CANCELLED = "CANCELLED", // when user or mechanic click cencel
-  COMPLETED = "COMPLETED", // after completed service
+  FINDING = "FINDING",
+  WAITING = "WAITING",
+  WORKING = "WORKING",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export enum CancelReason {

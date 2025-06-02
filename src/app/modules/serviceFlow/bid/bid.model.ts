@@ -7,6 +7,17 @@ const BidSchema = new Schema<IBid>(
       type: Number,
       required: true,
     },
+    location: {
+      placeId: {
+        type: String,
+      },
+      coordinates: {
+        type: { type: String, enum: ["Point"] }, // 'Point' is the type
+        coordinates: {
+          type: [Number], // Array of numbers (longitude, latitude)
+        },
+      },
+    },
 
     reqServiceId: {
       type: Schema.Types.ObjectId,
