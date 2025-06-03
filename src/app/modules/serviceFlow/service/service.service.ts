@@ -5,9 +5,9 @@ import mongoose, { PipelineStage } from "mongoose";
 import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
-import { BidStatus } from "../bid/bid.interface";
+
 import { payToMechanic, StripeService } from "../../stripe/stripe.service";
-import { createRoomAfterHire } from "../../chat/room/room.service";
+
 import User from "../../users/user/user.model";
 import AppError from "../../../errors/AppError";
 import status from "http-status";
@@ -24,6 +24,9 @@ const addServiceReq = async (
     location: {
       placeId: string;
       coordinates: number[];
+    };
+    schedule: {
+      date: Date;
     };
   },
   userId: string
@@ -59,6 +62,14 @@ const addServiceReq = async (
     ...serviceData,
     user: userId,
     location,
+    ...(serviceData.schedule?.date
+      ? {
+          schedule: {
+            date: serviceData.schedule.date,
+            isSchedule: true,
+          },
+        }
+      : {}),
   });
 
   const io = getSocket();
@@ -175,14 +186,14 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
   // Step 5: Add distance in Node.js (still more efficient this way)
   return bids.map((bid) => {
     const coords = bid.location?.coordinates?.coordinates;
-    console.log(coords, service.location.coordinates.coordinates);
+
     const distance = coords
       ? calculateDistance(
           service.location.coordinates.coordinates as [number, number],
           coords
         )
       : null;
-    console.log(distance);
+
     return {
       ...bid,
       distance:

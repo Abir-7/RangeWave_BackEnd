@@ -45,6 +45,19 @@ const serviceSchema = new Schema<IService>(
         },
       },
     },
+
+    schedule: {
+      isSchedule: {
+        type: Boolean,
+        required: true,
+        default: false,
+      },
+      date: {
+        type: Date,
+        required: false,
+        default: null,
+      },
+    },
   },
   { timestamps: true }
 );

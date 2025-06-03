@@ -15,7 +15,10 @@ export interface IService {
   };
 
   extraWork: Types.ObjectId; //! todo make function for extrapay
-
+  schedule: {
+    isSchedule: boolean;
+    date: Date;
+  };
   cancelReson: CancelReason;
 }
 

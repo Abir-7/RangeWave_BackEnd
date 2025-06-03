@@ -86,7 +86,7 @@ const savePaymentData = async (
     session.startTransaction();
 
     // Fetch Bid with populated fields (inside transaction session)
-    const bidData = await Bid.findById(bidId)
+    const bidData = (await Bid.findById(bidId)
       .populate({
         path: "reqServiceId",
       })
@@ -97,7 +97,9 @@ const savePaymentData = async (
         foreignField: "user",
         select: "-location -certificates -experience   -__v",
       })
-      .session(session);
+      .session(session)) as any;
+
+    console.log(bidData);
 
     if (!bidData) {
       throw new AppError(status.NOT_FOUND, "Bid not found");
@@ -115,10 +117,13 @@ const savePaymentData = async (
     if (!serviceData) {
       throw new Error("Service not found.");
     }
-    const users = [userId.toString(), bidData.mechanicId.toString()] as [
+
+    const users = [userId.toString(), bidData.mechanicId.user.toString()] as [
       string,
       string
     ];
+
+    console.log(users);
     await createRoomAfterHire(users, session);
 
     const newPaymentData = await Payment.findOneAndUpdate(
