@@ -251,6 +251,19 @@ const hireMechanic = async (bidId: string, userId: string) => {
         status: PaymentStatus.UNPAID,
       });
     }
+
+    if (
+      datas &&
+      (datas.status === PaymentStatus.HOLD ||
+        datas.status === PaymentStatus.REFUNDED ||
+        datas.status === PaymentStatus.PAID ||
+        datas.status === PaymentStatus.CANCELLED)
+    ) {
+      throw new AppError(
+        status.BAD_REQUEST,
+        `Payment for this bid status is: ${datas.status}`
+      );
+    }
   } else {
     throw new AppError(status.BAD_REQUEST, "Failed to create client secret.");
   }
