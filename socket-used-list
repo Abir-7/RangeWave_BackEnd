@@ -1,3 +1,0 @@
-  //socket-emit
-  
-  io.emit("req-list", service);

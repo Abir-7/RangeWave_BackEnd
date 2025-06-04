@@ -45,14 +45,14 @@ const updateMechanicProfile = async (
       const locations = removeFalsyFields(
         userLocation as unknown as Record<string, unknown>
       );
-      console.log(locations);
+
       for (const field in locations) {
         mechanicProfile.location[field as keyof ILocation] = (
           locations as Record<string, string>
         )[field];
       }
     }
-    console.log("object");
+
     if (location && Object.keys(location).length > 0) {
       const { coordinates, ...other } = location;
       const locations = removeFalsyFields(other) as Omit<

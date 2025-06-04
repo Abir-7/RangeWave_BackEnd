@@ -6,7 +6,7 @@ import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 
-import { payToMechanic, StripeService } from "../../stripe/stripe.service";
+import { StripeService } from "../../stripe/stripe.service";
 
 import User from "../../users/user/user.model";
 import AppError from "../../../errors/AppError";
@@ -14,6 +14,10 @@ import status from "http-status";
 import { getSocket } from "../../../socket/socket";
 import Payment from "../../stripe/payment.model";
 import { PaymentStatus } from "../../stripe/payment.interface";
+
+import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
+import { stripe } from "../../stripe/stripe";
+import { decrypt } from "../../../utils/helper/encrypt&decrypt";
 
 // ------------------------------------for users-------------------------------//
 
@@ -25,7 +29,7 @@ const addServiceReq = async (
       placeId: string;
       coordinates: number[];
     };
-    schedule: {
+    schedule?: {
       date: Date;
     };
   },
@@ -44,38 +48,56 @@ const addServiceReq = async (
   const startOfDay = new Date(today.setHours(0, 0, 0, 0));
   const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
-  // Query to find if any service exists with given statuses for this user today
-  const existingService = await Service.findOne({
-    user: userId,
-    status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
-    createdAt: { $gte: startOfDay, $lte: endOfDay },
-  });
+  const isScheduled = !!serviceData.schedule?.date;
 
-  if (existingService) {
-    throw new Error(
-      "You already have an active service request today with status finding, working, or waiting."
-    );
+  // 1. If this is a scheduled request, check if there's already a scheduled service today
+  if (isScheduled) {
+    const existingScheduled = await Service.findOne({
+      user: userId,
+      status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+      "schedule.isSchedule": true,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    if (existingScheduled) {
+      throw new Error("You already have a scheduled service request today.");
+    }
+  }
+  // 2. If this is an unscheduled request, check if there's already an unscheduled service today
+  else {
+    const existingUnscheduled = await Service.findOne({
+      user: userId,
+      status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+      "schedule.isSchedule": false,
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+    });
+
+    if (existingUnscheduled) {
+      throw new Error("You already have an unscheduled service request today.");
+    }
   }
 
   // If no conflict, create the new service
   const service = await Service.create({
-    ...serviceData,
+    issue: serviceData.issue,
+    description: serviceData.description,
     user: userId,
     location,
-    ...(serviceData.schedule?.date
+    ...(isScheduled
       ? {
           schedule: {
-            date: serviceData.schedule.date,
             isSchedule: true,
+            date: serviceData.schedule!.date,
           },
         }
-      : {}),
+      : {
+          // For unscheduled, rely on default: { isSchedule: false, date: null }
+        }),
   });
 
   const io = getSocket();
-
-  //socket-emit
-  io.emit("new-service", { newServiceId: service._id });
+  // socket-emit
+  io.emit("new-service", { serviceId: service._id });
 
   return service;
 };
@@ -126,6 +148,15 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
   const bids = await Bid.aggregate([
     { $match: { reqServiceId: service._id } },
 
+    {
+      $lookup: {
+        from: "services",
+        localField: "reqServiceId",
+        foreignField: "_id",
+        as: "service",
+      },
+    },
+    { $unwind: "$service" },
     // Step 1: Join Mechanic Profile
     {
       $lookup: {
@@ -167,6 +198,8 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
     // Step 4: Project only needed fields
     {
       $project: {
+        "service.schedule": 1,
+        "service._id": 1,
         price: 1,
         status: 1,
         mechanicId: 1,
@@ -196,6 +229,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
     return {
       ...bid,
+
       distance:
         distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
     };
@@ -257,6 +291,9 @@ const cancelService = async (
     // Note: This is NOT a DB operation, so it can't be part of the DB transaction
     await StripeService.refundPayment(bid._id, session);
 
+    const io = getSocket();
+    io.emit("cencel", { serviceId: id });
+
     // 4. Commit transaction only after refund succeeds
     await session.commitTransaction();
     session.endSession();
@@ -271,27 +308,92 @@ const cancelService = async (
 };
 
 const markServiceAsComplete = async (sId: string) => {
-  const serviceData = await Service.findOne({
-    _id: sId,
-    status: Status.COMPLETED,
-  });
+  const session = await mongoose.startSession();
 
-  if (!serviceData) {
-    throw new AppError(status.NOT_FOUND, "Service data not found.");
-  }
+  try {
+    const serviceData = await Service.findOne({
+      _id: sId,
+      status: Status.COMPLETED,
+    });
 
-  if (serviceData.isStatusAccepted !== false) {
-    throw new AppError(
-      status.BAD_REQUEST,
-      "Service failed to mark as completed."
+    if (!serviceData) {
+      throw new AppError(status.NOT_FOUND, "Service data not found.");
+    }
+
+    if (serviceData.isStatusAccepted !== false) {
+      throw new AppError(
+        status.BAD_REQUEST,
+        "Service failed to mark as completed."
+      );
+    }
+
+    serviceData.isStatusAccepted = true; //--------------------
+
+    await serviceData.save({ session });
+
+    const bidData = await Bid.findOne({
+      reqServiceId: serviceData._id,
+    }).session(session);
+
+    if (!bidData) {
+      throw new Error("Bid data not found");
+    }
+
+    const paymentRecord = await Payment.findOne({
+      bidId: bidData?._id,
+    }).session(session);
+
+    if (!paymentRecord || !paymentRecord.txId) {
+      throw new Error("Payment or txId not found");
+    }
+
+    const mechanicProfile = await MechanicProfile.findById(
+      bidData.mechanicId
+    ).session(session);
+
+    if (!mechanicProfile || !mechanicProfile.stripeAccountId) {
+      throw new Error("Mechanic Stripe ID missing");
+    }
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(
+      paymentRecord.txId
     );
+    if (paymentIntent.status !== "succeeded") {
+      throw new Error("Payment not successful");
+    }
+
+    const stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
+
+    const amountToTransfer = Math.floor(paymentIntent.amount_received * 0.9);
+
+    const transfer = await stripe.transfers.create({
+      amount: amountToTransfer,
+      currency: paymentIntent.currency,
+      destination: stripeAccountId,
+      description: `Payout for bid ${bidData._id}`,
+    });
+
+    if (!transfer.id) {
+      throw new AppError(status.BAD_REQUEST, "Faild to transfer payment");
+    }
+
+    paymentRecord.status = PaymentStatus.PAID;
+    paymentRecord.transferId = transfer.id;
+    await paymentRecord.save({ session });
+
+    const io = getSocket();
+
+    io.emit("markAsComplete", { bidId: bidData._id });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return serviceData;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new Error(error as any);
   }
-
-  serviceData.isStatusAccepted = true;
-
-  await serviceData.save();
-  await payToMechanic(serviceData._id);
-  return serviceData;
 };
 
 // ---------------------------------for mechanics and users-------------------------------//
@@ -461,7 +563,11 @@ const changeServiceStatus = async (bId: string) => {
     throw new AppError(status.BAD_REQUEST, "Faild to change service status");
   }
 
-  return await serviceData.save();
+  const newData = await serviceData.save();
+
+  const io = getSocket();
+  io.emit("status", { serviceId: serviceData._id });
+  return newData;
 };
 
 const seeServiceDetails = async (sId: string) => {

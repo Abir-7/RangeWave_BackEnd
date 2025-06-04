@@ -5,6 +5,7 @@ import { BidStatus, IBid } from "./bid.interface";
 import Bid from "./bid.model";
 import { Status } from "../service/service.interface";
 import { Service } from "../service/service.model";
+import { getSocket } from "../../../socket/socket";
 
 const addBid = async (
   bidData: {
@@ -52,6 +53,10 @@ const addBid = async (
     mechanicId: userId,
     status: BidStatus.provided,
   });
+
+  const io = getSocket();
+
+  io.emit("new-bid", { serviceId: saveBid._id });
 
   return saveBid;
 };

@@ -16,6 +16,7 @@ import Payment from "./payment.model";
 import { PaymentStatus } from "./payment.interface";
 import { Service } from "../serviceFlow/service/service.model";
 import { createRoomAfterHire } from "../chat/room/room.service";
+import { getSocket } from "../../socket/socket";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
@@ -139,11 +140,15 @@ const savePaymentData = async (
       );
     }
 
+    const io = getSocket();
+    io.emit("new-hire", { bidId });
+
     // Commit transaction
     await session.commitTransaction();
     await session.endSession();
     return await newPaymentData.populate({
       path: "bidId",
+      populate: "reqServiceId",
     });
   } catch (error: any) {
     console.log(error);
@@ -199,44 +204,4 @@ export const StripeService = {
   createPaymentIntent,
   savePaymentData,
   refundPayment,
-};
-
-// used in service section : mark as completed function
-export const payToMechanic = async (sId: string | Types.ObjectId) => {
-  const bidData = await Bid.findOne({ reqServiceId: sId });
-  if (!bidData) {
-    throw new Error("Bid data not found");
-  }
-  const paymentRecord = await Payment.findOne({ bidId: bidData?._id });
-  if (!paymentRecord || !paymentRecord.txId) {
-    throw new Error("Payment or txId not found");
-  }
-
-  const mechanicProfile = await MechanicProfile.findById(bidData.mechanicId);
-  if (!mechanicProfile || !mechanicProfile.stripeAccountId) {
-    throw new Error("Mechanic Stripe ID missing");
-  }
-
-  const paymentIntent = await stripe.paymentIntents.retrieve(
-    paymentRecord.txId
-  );
-  if (paymentIntent.status !== "succeeded") {
-    throw new Error("Payment not successful");
-  }
-
-  const stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
-
-  const amountToTransfer = Math.floor(paymentIntent.amount_received * 0.9);
-
-  const transfer = await stripe.transfers.create({
-    amount: amountToTransfer,
-    currency: paymentIntent.currency,
-    destination: stripeAccountId,
-    description: `Payout for bid ${bidData._id}`,
-  });
-
-  paymentRecord.status = PaymentStatus.PAID;
-  paymentRecord.transferId = transfer.id;
-  await paymentRecord.save();
-  return transfer;
 };
