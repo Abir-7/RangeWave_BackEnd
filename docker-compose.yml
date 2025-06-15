@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  express:
+    build: .
+    container_name: range-wave-express-app
+    ports:
+      - "4001:4001"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev  # or `npm run start` depending on your setup
