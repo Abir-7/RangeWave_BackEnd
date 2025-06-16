@@ -1,11 +1,10 @@
-/* eslint-disable no-console */
-
 import server from "./app";
 import { appConfig } from "./app/config";
 import mongoose from "mongoose";
-import logger from "./app/utils/logger";
+
 import seedAdmin from "./app/DB";
-import { initSocket } from "./app/socket/socket";
+import { initWorkers, shutdownWorkers } from "./app/bullMQ/worker/initWorkers";
+import logger from "./app/utils/logger";
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught exception:", err);
@@ -18,11 +17,22 @@ process.on("unhandledRejection", (err) => {
   process.exit(1);
 });
 
+// Handle shutdown gracefully
+process.on("SIGINT", async () => {
+  await shutdownWorkers();
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  await shutdownWorkers();
+  process.exit(0);
+});
+
 const main = async () => {
   await mongoose.connect(appConfig.database.dataBase_uri as string);
   logger.info("MongoDB connected");
   await seedAdmin();
-  await initSocket(server);
+  await initWorkers();
   server.listen(
     Number(appConfig.server.port),
     appConfig.server.ip as string,
@@ -35,6 +45,5 @@ const main = async () => {
     }
   );
 };
-main().catch((err) => {
-  logger.error("Error connecting to MongoDB:", err);
-});
+
+main().catch((err) => logger.error("Error connecting to MongoDB:", err));

@@ -9,7 +9,7 @@ import path from "path";
 const app = express();
 
 const corsOption = {
-  origin: ["*"],
+  origin: ["*", "https://"],
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
 };

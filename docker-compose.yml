@@ -1,13 +1,21 @@
 version: '3.8'
 
 services:
-  express:
+  redis-range-wave:
+    image: redis
+    container_name: range-wave-redis-queue
+    ports:
+     - "6378:6379"
+
+  express-range-wave:
     build: .
     container_name: range-wave-express-app
     ports:
       - "4001:4001"
     env_file:
       - .env
+    depends_on:
+      - redis-range-wave
     volumes:
       - .:/app
       - /app/node_modules

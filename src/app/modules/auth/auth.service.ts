@@ -16,6 +16,7 @@ import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model"
 import { startSession } from "mongoose";
 import { IUser } from "../users/user/user.interface";
 import { TUserRole } from "../../interface/auth.interface";
+import { emailQueue } from "../../bullMQ/queue/email.queue";
 
 const createUser = async (
   data: {
@@ -75,11 +76,17 @@ const createUser = async (
     }
 
     // Send email verification
-    await sendEmail(
-      data.email,
-      "Email Verification Code",
-      `Your code is: ${otp}`
-    );
+    // await sendEmail(
+    //   data.email,
+    //   "Email Verification Code",
+    //   `Your code is: ${otp}`
+    // );
+
+    await emailQueue.add("send-verification-email", {
+      email: data.email,
+      subject: "Email Verification Code",
+      text: `Your code is: ${otp}`,
+    });
 
     // Commit the transaction
     await session.commitTransaction();

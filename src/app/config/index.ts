@@ -42,4 +42,8 @@ export const appConfig = {
   encrypt: {
     s_key: process.env.ENCRYPTION_SECRET_KEY,
   },
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: process.env.REDIS_PORT,
+  },
 };

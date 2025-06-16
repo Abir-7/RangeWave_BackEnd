@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 export interface IAuthData {
   userEmail: string;
   userId: string;

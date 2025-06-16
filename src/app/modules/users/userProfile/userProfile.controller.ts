@@ -17,5 +17,5 @@ const updateUserProfile = catchAsync(async (req, res) => {
     data: result,
   });
 });
-
+//
 export const UserProfileController = { updateUserProfile };

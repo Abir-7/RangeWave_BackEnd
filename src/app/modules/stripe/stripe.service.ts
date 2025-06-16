@@ -45,7 +45,6 @@ const createAndConnect = async (mechanicEmail: string) => {
     return_url: `${appConfig.server.base_url}/stripe/onboarding/success`,
     type: "account_onboarding",
   });
-
   return { url: accountLink.url, accountId: account.id };
 };
 
