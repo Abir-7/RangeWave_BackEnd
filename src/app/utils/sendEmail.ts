@@ -115,7 +115,7 @@ export async function sendEmail(email: string, subject: string, text: string) {
               <p>${text}</p>
             </div>
             <div class="footer">
-              <p>&copy; ${new Date().getFullYear()} AiFinanceHub. All rights reserved.</p>
+              <p>&copy; ${new Date().getFullYear()} Ticket Support. All rights reserved.</p>
             </div>
           </div>
         </body>

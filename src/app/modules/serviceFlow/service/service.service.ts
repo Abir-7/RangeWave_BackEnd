@@ -1,3 +1,4 @@
+import { status } from "http-status";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import mongoose, { PipelineStage } from "mongoose";
@@ -10,7 +11,7 @@ import { StripeService } from "../../stripe/stripe.service";
 
 import User from "../../users/user/user.model";
 import AppError from "../../../errors/AppError";
-import status from "http-status";
+
 import { getSocket } from "../../../socket/socket";
 import Payment from "../../stripe/payment.model";
 import { PaymentStatus } from "../../stripe/payment.interface";
@@ -18,6 +19,7 @@ import { PaymentStatus } from "../../stripe/payment.interface";
 import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 import { stripe } from "../../stripe/stripe";
 import { decrypt } from "../../../utils/helper/encrypt&decrypt";
+import logger from "../../../utils/logger";
 
 // ------------------------------------for users-------------------------------//
 
@@ -130,19 +132,29 @@ const calculateDistance = (
     Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) ** 2;
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
+  console.log(coords1, coords2, Number((R * c).toFixed(2)));
   return Number((R * c).toFixed(2));
 };
 
 const getBidListOfService = async (serviceId: string, userId: string) => {
   const service = await Service.findOne({
     _id: serviceId,
-    status: Status.FINDING,
+
     user: userId,
   }).lean();
 
-  if (!service || !service.location?.coordinates) {
-    throw new Error("Service not found or missing location");
+  if (!service) {
+    throw new AppError(status.NOT_FOUND, " Service not found.");
+  }
+
+  if (service && service.status !== Status.FINDING) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Service is already in  ${service.status}  `
+    );
+  }
+  if (!service.location?.coordinates) {
+    throw new AppError(status.BAD_REQUEST, " missing location");
   }
 
   const bids = await Bid.aggregate([
@@ -416,100 +428,86 @@ const getRunningService = async (userId: string) => {
 
   const userData = await User.findById(userId).lean();
   if (userData && userData.role === "USER") {
-    const service = await Service.findOne({
-      user: userId,
-      status: { $in: activeStatuses },
-    })
-      .populate("extraWork")
-      .populate({
-        path: "user",
-        model: "UserProfile",
-        foreignField: "user",
-        select: "fullName email -_id image",
-      })
-      .select("status issue location description")
-      .lean();
+    const serviceData = await Service.aggregate([
+      {
+        $match: {
+          status: { $in: activeStatuses },
+          user: new mongoose.Types.ObjectId(userId),
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          issue: 1,
+          description: 1,
+          user: 1,
+          schedule: 1,
+          status: 1,
+          bidId: null,
+        },
+      },
+    ]);
 
-    if (!service) {
+    if (serviceData.length === 0) {
       throw new Error("Service not found");
     }
 
-    const bidData = (await Bid.findOne({ reqServiceId: service._id })
-      .populate({
-        path: "mechanicId",
-        model: "MechanicProfile",
-        foreignField: "user",
-        select: "fullName email image workshop.location",
-      })
-      .lean()) as any;
-
-    const location =
-      bidData?.mechanicId.workshop.location.coordinates.coordinates;
-    const { workshop, ...other } = bidData.mechanicId;
-    return {
-      ...service,
-      price: bidData?.price,
-      mechanicProfile: {
-        ...other,
-        location: location,
-      },
-    };
+    return serviceData;
   } else if (userData && userData?.role === "MECHANIC") {
-    const bidData = (await Bid.findOne(
+    const serviceData = await Service.aggregate([
       {
-        mechanicId: userId,
-      },
-      { price: 1, status: 1, reqServiceId: 1 }
-    ) // only needed bid fields
-      .populate({
-        path: "reqServiceId",
-        match: { status: { $in: [Status.WORKING, Status.WAITING] } },
-        select: "status issue location description",
-        populate: [
-          {
-            path: "extraWork",
-            select: "issue description price status",
-            options: { lean: true },
-          },
-          {
-            path: "user",
-            model: "UserProfile",
-            foreignField: "user",
-            select: "fullName -_id image email user",
-            options: { lean: true },
-          }, // adjust user fields as needed
-        ],
-        options: { lean: true }, // populate with lean for performance
-      })
-      .populate({
-        path: "mechanicId",
-        model: "MechanicProfile",
-        foreignField: "user",
-        select: "fullName -_id email workshop image",
-      })
-      .lean() // make the main query lean
-      .exec()) as any;
-
-    console.log(bidData);
-
-    if (bidData && bidData?.reqServiceId?._id) {
-      const location =
-        bidData?.mechanicId.workshop.location.coordinates.coordinates;
-      const { workshop, ...other } = bidData.mechanicId;
-
-      return {
-        ...bidData.reqServiceId,
-        price: bidData.price,
-        mechanicProfile: {
-          ...other,
-          location: location,
+        $match: {
+          status: { $in: activeStatuses },
         },
-      };
+      },
+      {
+        $lookup: {
+          from: "bids",
+          localField: "_id",
+          foreignField: "reqServiceId",
+
+          as: "bidData",
+        },
+      },
+      {
+        $addFields: {
+          bidData: {
+            $filter: {
+              input: "$bidData",
+              as: "bid",
+              cond: {
+                $eq: ["$$bid.mechanicId", new mongoose.Types.ObjectId(userId)],
+              },
+            },
+          },
+        },
+      },
+      {
+        $unwind: {
+          path: "$bidData",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          issue: 1,
+          description: 1,
+          user: 1,
+          schedule: 1,
+          status: 1,
+          bidId: "$bidData._id",
+        },
+      },
+    ]);
+
+    if (serviceData.length === 0) {
+      throw new Error("Service not found");
     }
-    return null;
-  } else {
-    return null;
+
+    return serviceData;
   }
+  return [];
 };
 
 // ------------------------------------for mechanics-------------------------------//

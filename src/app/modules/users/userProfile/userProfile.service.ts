@@ -16,7 +16,6 @@ const updateUserProfile = async (
 
   try {
     session.startTransaction();
-
     // Fetch the profile data within the transaction
     const profileData = await UserProfile.findOne({ email }).session(session);
 
@@ -24,15 +23,21 @@ const updateUserProfile = async (
       throw new AppError(status.NOT_FOUND, "User profile not found.");
     }
 
-    const { fullName, carInfo, dateOfBirth, location, phone } = data;
+    const { fullName, carInfo, dateOfBirth, location, phone, nickname } = data;
 
     // Update the profile data if the fields are provided
     if (fullName) {
       profileData.fullName = fullName;
     }
+
+    if (nickname) {
+      profileData.nickname = nickname;
+    }
+
     if (dateOfBirth) {
       profileData.dateOfBirth = dateOfBirth;
     }
+
     if (phone) {
       profileData.phone = phone;
     }

@@ -11,12 +11,13 @@ import { sendEmail } from "../../utils/sendEmail";
 import getHashedPassword from "../../utils/helper/getHashedPassword";
 import { appConfig } from "../../config";
 import { jwtDecode } from "jwt-decode";
-import { UserProfile } from "../users/userProfile/userProfile.model";
+
 import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model";
 import { startSession } from "mongoose";
 import { IUser } from "../users/user/user.interface";
 import { TUserRole } from "../../interface/auth.interface";
 import { emailQueue } from "../../bullMQ/queue/email.queue";
+import { UserProfile } from "../users/userProfile/userProfile.model";
 
 const createUser = async (
   data: {
@@ -119,7 +120,7 @@ const userLogin = async (loginData: {
     "+password"
   );
   if (!userData) {
-    throw new AppError(status.BAD_REQUEST, "Please check your email");
+    throw new AppError(status.NOT_FOUND, "User not found");
   }
 
   if (userData.isVerified === false) {
@@ -130,6 +131,39 @@ const userLogin = async (loginData: {
 
   if (!isPassMatch) {
     throw new AppError(status.BAD_REQUEST, "Please check your password.");
+  }
+
+  let isInfoGiven = false;
+
+  if (userData.role === "USER") {
+    const userProfileData = await UserProfile.findOne({
+      user: userData._id,
+    });
+
+    if (!userProfileData) {
+      throw new AppError(status.NOT_FOUND, "User profile not found");
+    }
+
+    if (userProfileData.carInfo.carName && userProfileData.carInfo.carModel) {
+      isInfoGiven = true;
+    }
+  }
+
+  if (userData.role === "MECHANIC") {
+    const mechanicProfileData = await MechanicProfile.findOne({
+      user: userData._id,
+    });
+
+    if (!mechanicProfileData) {
+      throw new AppError(status.NOT_FOUND, "User profile not found");
+    }
+
+    if (
+      mechanicProfileData.workshop.name &&
+      mechanicProfileData.workshop.services
+    ) {
+      isInfoGiven = true;
+    }
   }
 
   const jwtPayload = {
@@ -163,6 +197,7 @@ const userLogin = async (loginData: {
     userData: {
       ...userData.toObject(),
       password: null,
+      ...(userData.role !== "ADMIN" ? { isInfoGiven } : {}),
     },
   };
 };

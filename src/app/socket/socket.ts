@@ -32,11 +32,6 @@ export const initSocket = async (httpServer: HttpServer) => {
         logger.info(
           `User ${userData.userId} already connected. Updating socket from ${existingUser.socketId} to ${socket.id}`
         );
-
-        // Optionally, you can disconnect the old socket
-        // const oldSocket = io?.sockets.sockets.get(existingUser.socketId);
-        // if (oldSocket) oldSocket.disconnect();
-
         // Update to new socketId
         connectedUsers.set(userData.userId, {
           userId: userData.userId,

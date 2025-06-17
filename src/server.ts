@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import seedAdmin from "./app/DB";
 import { initWorkers, shutdownWorkers } from "./app/bullMQ/worker/initWorkers";
 import logger from "./app/utils/logger";
+import { initSocket } from "./app/socket/socket";
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught exception:", err);
@@ -33,6 +34,7 @@ const main = async () => {
   logger.info("MongoDB connected");
   await seedAdmin();
   await initWorkers();
+  await initSocket(server);
   server.listen(
     Number(appConfig.server.port),
     appConfig.server.ip as string,

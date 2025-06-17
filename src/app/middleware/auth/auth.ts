@@ -29,7 +29,7 @@ export const auth =
         );
       }
       logger.info("token given");
-
+      console.log(token);
       const decodedData = jsonWebToken.verifyJwt(
         token,
         appConfig.jwt.jwt_access_secret as string
