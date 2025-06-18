@@ -49,8 +49,8 @@ const createAndConnect = async (mechanicEmail: string) => {
 };
 
 // its only use when hire mecanic function is call is service.service.ts file
-const createPaymentIntent = async (bidId: string) => {
-  const bidData = await Bid.findById(bidId);
+const createPaymentIntent = async (bidId: string, serviceId: string) => {
+  const bidData = await Bid.findOne({ _id: bidId, reqServiceId: serviceId });
 
   if (!bidData) {
     throw new AppError(status.NOT_FOUND, "Bid data not found");

@@ -5,11 +5,17 @@ const paymentSchema: Schema<IPayment> = new Schema(
   {
     txId: { type: String, unique: true, sparse: true },
     transferId: { type: String, unique: true, sparse: true },
-    bidId: { type: mongoose.Schema.Types.ObjectId, ref: "Bid", required: true },
+    bidId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Bid",
+      required: true,
+      unique: true,
+    },
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Service",
       required: true,
+      unique: true,
     },
     status: {
       type: String,

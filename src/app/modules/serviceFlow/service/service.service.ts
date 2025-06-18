@@ -255,7 +255,19 @@ const hireMechanic = async (
   data: { bidId: string; serviceId: string },
   userId: string
 ) => {
-  const paymentIntent = await StripeService.createPaymentIntent(data.bidId);
+  const isServiceExist = await Service.findOne({
+    _id: data.serviceId,
+    user: userId,
+  });
+
+  if (!isServiceExist) {
+    throw new AppError(status.NOT_FOUND, "Service not found.");
+  }
+
+  const paymentIntent = await StripeService.createPaymentIntent(
+    data.bidId,
+    data.serviceId
+  );
 
   if (paymentIntent.client_secret) {
     const datas = await Payment.findOne({
@@ -430,7 +442,12 @@ const markServiceAsComplete = async (sId: string) => {
 // ---------------------------------for mechanics and users-------------------------------//
 
 const getRunningService = async (userId: string) => {
-  const activeStatuses = [Status.WORKING, Status.WAITING];
+  const activeStatuses = [
+    Status.WORKING,
+    Status.WAITING,
+    Status.COMPLETED,
+    Status.FINDING,
+  ];
 
   const userData = await User.findById(userId).lean();
   if (userData && userData.role === "USER") {
@@ -442,6 +459,86 @@ const getRunningService = async (userId: string) => {
         },
       },
       {
+        $lookup: {
+          from: "payments",
+          let: { serviceId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$serviceId", "$$serviceId"] },
+              },
+            },
+            {
+              $lookup: {
+                from: "bids",
+                let: { bidId: "$bidId" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: { $eq: ["$_id", "$$bidId"] },
+                    },
+                  },
+                  {
+                    $lookup: {
+                      from: "users",
+                      let: { mechanicId: "$mechanicId" },
+                      pipeline: [
+                        {
+                          $match: {
+                            $expr: { $eq: ["$_id", "$$mechanicId"] },
+                          },
+                        },
+                        {
+                          $lookup: {
+                            from: "mechanicprofiles",
+                            let: { userId: "$_id" },
+                            pipeline: [
+                              {
+                                $match: {
+                                  $expr: { $eq: ["$user", "$$userId"] },
+                                },
+                              },
+                            ],
+                            as: "profileData",
+                          },
+                        },
+                        {
+                          $unwind: {
+                            path: "$profileData",
+                            preserveNullAndEmptyArrays: true,
+                          },
+                        },
+                      ],
+                      as: "userData",
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: "$userData",
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                ],
+                as: "bidData",
+              },
+            },
+            {
+              $unwind: {
+                path: "$bidData",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+          ],
+          as: "paymentData",
+        },
+      },
+      {
+        $unwind: {
+          path: "$paymentData",
+          // No preserve => this skips services with no payments
+        },
+      },
+      {
         $project: {
           _id: 1,
           issue: 1,
@@ -449,7 +546,8 @@ const getRunningService = async (userId: string) => {
           user: 1,
           schedule: 1,
           status: 1,
-          bidId: null,
+          bidId: "$paymentData.bidId",
+          profileData: "$paymentData.bidData.userData.profileData", // already flattened
         },
       },
     ]);
