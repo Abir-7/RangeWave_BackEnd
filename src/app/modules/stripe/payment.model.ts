@@ -6,6 +6,11 @@ const paymentSchema: Schema<IPayment> = new Schema(
     txId: { type: String, unique: true, sparse: true },
     transferId: { type: String, unique: true, sparse: true },
     bidId: { type: mongoose.Schema.Types.ObjectId, ref: "Bid", required: true },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Service",
+      required: true,
+    },
     status: {
       type: String,
       enum: Object.values(PaymentStatus),

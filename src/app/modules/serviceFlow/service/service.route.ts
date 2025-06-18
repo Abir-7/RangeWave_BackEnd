@@ -53,6 +53,11 @@ router.get(
   auth("MECHANIC", "USER"),
   ServiceController.getRunningService
 );
+router.get(
+  "/see-running-service-progress",
+  auth("MECHANIC", "USER"),
+  ServiceController.seeCurrentServiceProgress
+);
 
 router.patch(
   "/cencel-service/:sId",

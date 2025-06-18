@@ -70,10 +70,10 @@ const createPaymentIntent = async (bidId: string) => {
 };
 
 const savePaymentData = async (
-  data: { txId: string; bidId: string },
+  data: { txId: string; bidId: string; serviceId: string },
   userId: string
 ) => {
-  const { txId, bidId } = data;
+  const { txId, bidId, serviceId } = data;
 
   if (!txId || !bidId) {
     throw new AppError(status.NOT_FOUND, `provide ${!txId ? "txId" : "bidId"}`);
@@ -86,7 +86,7 @@ const savePaymentData = async (
     session.startTransaction();
 
     // Fetch Bid with populated fields (inside transaction session)
-    const bidData = (await Bid.findById(bidId)
+    const bidData = (await Bid.findOne({ bidId, reqServiceId: serviceId })
       .populate({
         path: "reqServiceId",
       })
@@ -123,11 +123,10 @@ const savePaymentData = async (
       string
     ];
 
-    console.log(users);
     await createRoomAfterHire(users, session);
 
     const newPaymentData = await Payment.findOneAndUpdate(
-      { bidId: bidId },
+      { bidId, serviceId },
       { txId, status: PaymentStatus.HOLD },
       { new: true, session } // <-- pass session here
     );

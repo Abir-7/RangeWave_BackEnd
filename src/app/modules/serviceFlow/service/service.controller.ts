@@ -64,6 +64,19 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const seeCurrentServiceProgress = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await ServiceService.seeCurrentServiceProgress(
+      req.user.userId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Current Service progress data is fetched successfully",
+      data: result,
+    });
+  }
+);
 
 const cancelService = catchAsync(async (req: Request, res: Response) => {
   const { sId } = req.params;
@@ -165,6 +178,7 @@ export const ServiceController = {
   reqForExtraWork,
 
   getRunningService,
+  seeCurrentServiceProgress,
   getAllRequestedService,
 
   pushNewServiceReq,

@@ -20,6 +20,7 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 import { stripe } from "../../stripe/stripe";
 import { decrypt } from "../../../utils/helper/encrypt&decrypt";
 import logger from "../../../utils/logger";
+import { BidStatus } from "../bid/bid.interface";
 
 // ------------------------------------for users-------------------------------//
 
@@ -250,17 +251,21 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
 // call payment intent function from stripe.service.ts file
 
-const hireMechanic = async (bidId: string, userId: string) => {
-  const paymentIntent = await StripeService.createPaymentIntent(bidId);
+const hireMechanic = async (
+  data: { bidId: string; serviceId: string },
+  userId: string
+) => {
+  const paymentIntent = await StripeService.createPaymentIntent(data.bidId);
 
   if (paymentIntent.client_secret) {
     const datas = await Payment.findOne({
-      bidId: bidId,
+      ...data,
     });
     if (!datas) {
       await Payment.create({
-        bidId: bidId,
+        bidId: data.bidId,
         status: PaymentStatus.UNPAID,
+        serviceId: data.serviceId,
       });
     }
 
@@ -281,8 +286,9 @@ const hireMechanic = async (bidId: string, userId: string) => {
   }
 
   return {
-    bidId,
+    bidId: data.bidId,
     paymentIntent,
+    serviceId: data.serviceId,
   };
 };
 
@@ -424,7 +430,7 @@ const markServiceAsComplete = async (sId: string) => {
 // ---------------------------------for mechanics and users-------------------------------//
 
 const getRunningService = async (userId: string) => {
-  const activeStatuses = [Status.FINDING, Status.WORKING, Status.WAITING];
+  const activeStatuses = [Status.WORKING, Status.WAITING];
 
   const userData = await User.findById(userId).lean();
   if (userData && userData.role === "USER") {
@@ -507,7 +513,7 @@ const getRunningService = async (userId: string) => {
 
     return serviceData;
   }
-  return [];
+  throw new AppError(status.NOT_FOUND, "No active service found.");
 };
 
 // ------------------------------------for mechanics-------------------------------//
@@ -526,8 +532,10 @@ const getAllRequestedService = async () => {
         pipeline: [
           {
             $match: {
-              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
-              status: { $ne: "declined" },
+              $expr: {
+                $eq: ["$reqServiceId", "$$serviceId"],
+              },
+              status: { $ne: BidStatus.declined },
             },
           },
         ],
@@ -535,16 +543,31 @@ const getAllRequestedService = async () => {
       },
     },
     {
-      // Reshape the location field here
       $addFields: {
+        isBidDone: {
+          $gt: [
+            {
+              $size: {
+                $filter: {
+                  input: "$bid",
+                  as: "b",
+                  cond: { $eq: ["$$b.status", BidStatus.provided] },
+                },
+              },
+            },
+            0,
+          ],
+        },
         location: {
           placeId: "$location.placeId",
-          coordinates: "$location.coordinates.coordinates", // extract inner coordinates array
+          coordinates: "$location.coordinates.coordinates",
         },
       },
     },
     {
-      $project: { bid: 0 },
+      $project: {
+        bid: 0, // remove the full bid array if not needed
+      },
     },
   ];
 
@@ -592,7 +615,7 @@ const seeServiceDetails = async (sId: string) => {
         path: "user",
         model: "User",
         foreignField: "_id",
-        select: " -authentication -needToResetPass -needToUpdateProfile -__v ",
+        select: " -authentication  -needToResetPass -needToUpdateProfile -__v ",
       },
     })
     .lean();
@@ -607,6 +630,8 @@ const seeServiceDetails = async (sId: string) => {
     },
   };
 };
+
+const seeCurrentServiceProgress = async (sId: string) => {};
 
 const reqForExtraWork = async (
   sId: string,
@@ -775,7 +800,7 @@ export const ServiceService = {
   reqForExtraWork,
   getRunningService,
   getAllRequestedService,
-
+  seeCurrentServiceProgress,
   pushNewServiceReq,
   addNewBidDataToService,
   changeServiceStatus,

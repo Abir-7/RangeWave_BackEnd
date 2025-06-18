@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 export interface IPayment {
   txId: string;
   bidId: Types.ObjectId;
+  serviceId: Types.ObjectId;
   status: PaymentStatus;
   extraPay: { work: Types.ObjectId; txId: string }; //! todo make function for extrapay
   transferId: string;
