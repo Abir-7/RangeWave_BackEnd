@@ -18,6 +18,20 @@ const addServiceReq = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const checkServiceStatusFinding = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await ServiceService.checkServiceStatusFinding(
+      req.user.userId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Service with status finding fetched successfully",
+      data: result,
+    });
+  }
+);
+
 const getBidListOfService = catchAsync(async (req: Request, res: Response) => {
   const { sId } = req.params;
   const result = await ServiceService.getBidListOfService(sId, req.user.userId);
@@ -53,7 +67,7 @@ const markServiceAsComplete = catchAsync(
   }
 );
 
-//-------------------------------- For Both Mechanics and Users-------------------------------------------//
+//---------------------------- For Both Mechanics and Users-----------------------------//
 
 const getRunningService = catchAsync(async (req: Request, res: Response) => {
   const result = await ServiceService.getRunningService(req.user.userId);
@@ -64,6 +78,7 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
 const seeCurrentServiceProgress = catchAsync(
   async (req: Request, res: Response) => {
     const result = await ServiceService.seeCurrentServiceProgress(
@@ -170,6 +185,7 @@ const addNewBidDataToService = catchAsync(
 
 export const ServiceController = {
   addServiceReq,
+  checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
   cancelService,

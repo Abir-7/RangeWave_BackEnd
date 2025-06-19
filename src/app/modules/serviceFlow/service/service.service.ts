@@ -105,6 +105,18 @@ const addServiceReq = async (
   return service;
 };
 
+const checkServiceStatusFinding = async (userId: string) => {
+  const services = await Service.find({
+    user: userId,
+    status: Status.FINDING,
+  });
+
+  const immediateService = services.filter((s) => !s.schedule?.isSchedule);
+  const scheduledService = services.filter((s) => s.schedule?.isSchedule);
+
+  return { immediateService, scheduledService };
+};
+
 //helper function
 const calculateDistance = (
   coords1: [number, number],
@@ -442,12 +454,7 @@ const markServiceAsComplete = async (sId: string) => {
 // ---------------------------------for mechanics and users-------------------------------//
 
 const getRunningService = async (userId: string) => {
-  const activeStatuses = [
-    Status.WORKING,
-    Status.WAITING,
-    Status.COMPLETED,
-    Status.FINDING,
-  ];
+  const activeStatuses = [Status.WORKING, Status.WAITING, Status.COMPLETED];
 
   const userData = await User.findById(userId).lean();
   if (userData && userData.role === "USER") {
@@ -479,53 +486,81 @@ const getRunningService = async (userId: string) => {
                     },
                   },
                   {
+                    $project: {
+                      _id: 1,
+                      mechanicId: 1,
+                      price: 1,
+                    },
+                  },
+                ],
+                as: "bid",
+              },
+            },
+            {
+              $unwind: "$bid",
+            },
+            {
+              $lookup: {
+                from: "users",
+                let: { mechanicId: "$bid.mechanicId" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: { $eq: ["$_id", "$$mechanicId"] },
+                    },
+                  },
+                  {
                     $lookup: {
-                      from: "users",
-                      let: { mechanicId: "$mechanicId" },
+                      from: "mechanicprofiles",
+                      let: { userId: "$_id" },
                       pipeline: [
                         {
                           $match: {
-                            $expr: { $eq: ["$_id", "$$mechanicId"] },
+                            $expr: { $eq: ["$user", "$$userId"] },
                           },
                         },
                         {
-                          $lookup: {
-                            from: "mechanicprofiles",
-                            let: { userId: "$_id" },
-                            pipeline: [
-                              {
-                                $match: {
-                                  $expr: { $eq: ["$user", "$$userId"] },
-                                },
-                              },
-                            ],
-                            as: "profileData",
-                          },
-                        },
-                        {
-                          $unwind: {
-                            path: "$profileData",
-                            preserveNullAndEmptyArrays: true,
+                          $project: {
+                            _id: 0,
+                            location: 0,
+                            workshop: 0,
+                            experience: 0,
+                            certificates: 0,
+                            createdAt: 0,
+                            updatedAt: 0,
+                            __v: 0,
                           },
                         },
                       ],
-                      as: "userData",
+                      as: "profileData",
                     },
                   },
                   {
                     $unwind: {
-                      path: "$userData",
+                      path: "$profileData",
                       preserveNullAndEmptyArrays: true,
                     },
                   },
+                  {
+                    $project: {
+                      _id: 0,
+                      role: 1,
+                      profileData: 1,
+                    },
+                  },
                 ],
-                as: "bidData",
+                as: "mechanic",
               },
             },
             {
-              $unwind: {
-                path: "$bidData",
-                preserveNullAndEmptyArrays: true,
+              $unwind: "$mechanic",
+            },
+            {
+              $project: {
+                _id: 1,
+                bidId: "$bid._id",
+                price: "$bid.price",
+                mechanic: 1,
               },
             },
           ],
@@ -533,10 +568,7 @@ const getRunningService = async (userId: string) => {
         },
       },
       {
-        $unwind: {
-          path: "$paymentData",
-          // No preserve => this skips services with no payments
-        },
+        $unwind: "$paymentData",
       },
       {
         $project: {
@@ -546,8 +578,12 @@ const getRunningService = async (userId: string) => {
           user: 1,
           schedule: 1,
           status: 1,
-          bidId: "$paymentData.bidId",
-          profileData: "$paymentData.bidData.userData.profileData", // already flattened
+
+          bidData: {
+            bidId: "$paymentData.bidId",
+            price: "$paymentData.price",
+          },
+          profile: "$paymentData.mechanic",
         },
       },
     ]);
@@ -566,32 +602,75 @@ const getRunningService = async (userId: string) => {
       },
       {
         $lookup: {
-          from: "bids",
+          from: "payments",
           localField: "_id",
-          foreignField: "reqServiceId",
-
-          as: "bidData",
-        },
-      },
-      {
-        $addFields: {
-          bidData: {
-            $filter: {
-              input: "$bidData",
-              as: "bid",
-              cond: {
-                $eq: ["$$bid.mechanicId", new mongoose.Types.ObjectId(userId)],
+          foreignField: "serviceId",
+          pipeline: [
+            {
+              $lookup: {
+                from: "bids",
+                localField: "bidId",
+                foreignField: "_id",
+                pipeline: [
+                  {
+                    $match: { mechanicId: new mongoose.Types.ObjectId(userId) },
+                  },
+                ],
+                as: "bidData",
               },
             },
-          },
+            { $unwind: "$bidData" },
+          ],
+          as: "paymentData",
         },
       },
+
       {
         $unwind: {
-          path: "$bidData",
+          path: "$paymentData",
           preserveNullAndEmptyArrays: true,
         },
       },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          pipeline: [
+            {
+              $lookup: {
+                from: "userprofiles",
+                localField: "_id",
+                foreignField: "user",
+                pipeline: [
+                  {
+                    $project: {
+                      createdAt: 0,
+                      updatedAt: 0,
+                      carInfo: 0,
+                      dateOfBirth: 0,
+                      location: 0,
+                      __v: 0,
+                    },
+                  },
+                ],
+                as: "profileData",
+              },
+            },
+            { $unwind: "$profileData" },
+            {
+              $project: {
+                _id: 0, // if you don't need user _id
+                role: 1, // keep from user collection
+                profileData: 1,
+              },
+            },
+          ],
+          as: "profile",
+        },
+      },
+      { $unwind: "$profile" },
       {
         $project: {
           _id: 1,
@@ -600,7 +679,11 @@ const getRunningService = async (userId: string) => {
           user: 1,
           schedule: 1,
           status: 1,
-          bidId: "$bidData._id",
+          bidData: {
+            bidId: "$paymentData.bidId",
+            price: "$paymentData.bidData.price",
+          },
+          profile: 1,
         },
       },
     ]);
@@ -891,6 +974,7 @@ const addNewBidDataToService = async (
 
 export const ServiceService = {
   addServiceReq,
+  checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
   cancelService,

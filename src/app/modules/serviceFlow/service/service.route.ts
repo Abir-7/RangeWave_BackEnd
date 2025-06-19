@@ -14,6 +14,12 @@ router.get(
   ServiceController.getBidListOfService
 );
 
+router.get(
+  "/check-service-status-finding",
+  auth("USER"),
+  ServiceController.checkServiceStatusFinding
+);
+
 router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
 router.patch(
   "/mark-service-as-complete/:sId",
