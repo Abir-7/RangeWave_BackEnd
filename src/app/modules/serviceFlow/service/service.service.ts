@@ -1,7 +1,7 @@
 import { status } from "http-status";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose, { PipelineStage } from "mongoose";
+import mongoose, { model, PipelineStage } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { ExtraWork, Service } from "./service.model";
 import { IService, Status } from "./service.interface";
@@ -22,7 +22,7 @@ import { decrypt } from "../../../utils/helper/encrypt&decrypt";
 import logger from "../../../utils/logger";
 import { BidStatus } from "../bid/bid.interface";
 
-// ------------------------------------for users-------------------------------//
+//! ----------------------------for users-------------------------------//
 
 const addServiceReq = async (
   serviceData: {
@@ -451,7 +451,7 @@ const markServiceAsComplete = async (sId: string) => {
   }
 };
 
-// ---------------------------------for mechanics and users-------------------------------//
+//! --------------------------for mechanics and users-------------------------------//
 
 const getRunningService = async (userId: string) => {
   const activeStatuses = [Status.WORKING, Status.WAITING, Status.COMPLETED];
@@ -697,7 +697,7 @@ const getRunningService = async (userId: string) => {
   throw new AppError(status.NOT_FOUND, "No active service found.");
 };
 
-// ------------------------------------for mechanics-------------------------------//
+//! ----------------------------for mechanics-------------------------------//
 
 const getAllRequestedService = async () => {
   const aggregateArray: PipelineStage[] = [
@@ -812,7 +812,36 @@ const seeServiceDetails = async (sId: string) => {
   };
 };
 
-const seeCurrentServiceProgress = async (sId: string) => {};
+const seeCurrentServiceProgress = async (sId: string) => {
+  const serviceData = await Payment.findOne({ serviceId: sId })
+    .populate({
+      path: "serviceId",
+      select: " -updatedAt  -createdAt",
+      populate: {
+        path: "user",
+        model: "UserProfile",
+        localField: "user",
+        foreignField: "user",
+        select: "-location   -dateOfBirth  -carInfo  -updatedAt  -createdAt",
+      },
+    })
+    .populate({
+      path: "bidId",
+      select: "-createdAt -updatedAt -__v",
+      populate: {
+        path: "mechanicId",
+        model: "MechanicProfile",
+        localField: "mechanicId",
+        foreignField: "user",
+        select:
+          "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
+      },
+    });
+
+  return serviceData;
+};
+
+//!------------------------------ Extra work ---------------------------------
 
 const reqForExtraWork = async (
   sId: string,

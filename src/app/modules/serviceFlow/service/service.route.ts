@@ -60,7 +60,7 @@ router.get(
   ServiceController.getRunningService
 );
 router.get(
-  "/see-running-service-progress",
+  "/see-running-service-progress/:id", //! todo------------------
   auth("MECHANIC", "USER"),
   ServiceController.seeCurrentServiceProgress
 );
