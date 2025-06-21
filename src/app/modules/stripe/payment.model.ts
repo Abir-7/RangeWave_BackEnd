@@ -29,6 +29,12 @@ const paymentSchema: Schema<IPayment> = new Schema(
         ref: "ExtraWork",
         default: null,
       },
+      status: {
+        type: String,
+        enum: Object.values(PaymentStatus),
+        default: PaymentStatus.UNPAID,
+        required: true,
+      },
       txId: { type: Schema.Types.ObjectId, default: null },
     },
   },

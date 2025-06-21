@@ -39,16 +39,3 @@ export enum CancelReason {
 }
 
 // For ExtraWorkModel
-
-export interface IExtraWork {
-  issue: string;
-  description: string;
-  price: number;
-  reqServiceId: Types.ObjectId;
-  status: ExtraWorkStatus;
-}
-export enum ExtraWorkStatus {
-  WAITING = "WAITING",
-  REJECTED = "REJECTED",
-  ACCEPTED = "ACCEPTED",
-}

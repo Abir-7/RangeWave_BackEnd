@@ -1,11 +1,5 @@
-import mongoose, { Model, Schema } from "mongoose";
-import {
-  CancelReason,
-  ExtraWorkStatus,
-  IExtraWork,
-  IService,
-  Status,
-} from "./service.interface";
+import mongoose, { Schema } from "mongoose";
+import { CancelReason, IService, Status } from "./service.interface";
 
 const serviceSchema = new Schema<IService>(
   {
@@ -65,34 +59,3 @@ const serviceSchema = new Schema<IService>(
 serviceSchema.index({ status: 1 });
 
 export const Service = mongoose.model<IService>("Service", serviceSchema);
-
-//-----------------------------------------EXTRA WORK MODEL-------------------------------------------------------------//
-
-const ExtraWorkSchema: Schema<IExtraWork> = new Schema(
-  {
-    issue: { type: String, required: true },
-    description: { type: String, required: true },
-    price: { type: Number, required: true, min: 0 },
-    reqServiceId: {
-      type: Schema.Types.ObjectId,
-      ref: "Service",
-      required: true,
-    },
-
-    status: {
-      type: String,
-      enum: Object.values(ExtraWorkStatus), // ensures status only uses enum values
-      default: ExtraWorkStatus.WAITING,
-      required: true,
-    },
-  },
-  {
-    timestamps: true, // optional: adds createdAt and updatedAt timestamps
-  }
-);
-
-// Model creation
-export const ExtraWork: Model<IExtraWork> = mongoose.model<IExtraWork>(
-  "ExtraWork",
-  ExtraWorkSchema
-);

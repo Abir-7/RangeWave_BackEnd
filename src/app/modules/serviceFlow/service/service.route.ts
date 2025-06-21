@@ -27,8 +27,7 @@ router.patch(
   ServiceController.markServiceAsComplete
 );
 
-//-----------------------------------------for mechanics
-
+//-----------------------------------------for mechanics-------------------------------
 router.get(
   "/get-requested-service-list",
   auth("MECHANIC"),
@@ -42,25 +41,20 @@ router.get(
 );
 
 router.patch(
-  "/change-service-status/:bId",
+  "/change-service-status/:sId",
   auth("MECHANIC"),
   ServiceController.changeServiceStatus
 );
 
-router.post(
-  "/req-for-extra-work/:sId",
-  auth("MECHANIC"),
-  ServiceController.reqForExtraWork
-);
-
-//---------------------------------------------for both
+//--------------------------------------for both-------------------------------
 router.get(
   "/get-running-service",
   auth("MECHANIC", "USER"),
   ServiceController.getRunningService
 );
+
 router.get(
-  "/see-running-service-progress/:id", //! todo------------------
+  "/see-running-service-progress/:id",
   auth("MECHANIC", "USER"),
   ServiceController.seeCurrentServiceProgress
 );

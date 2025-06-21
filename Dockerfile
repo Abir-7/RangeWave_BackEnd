@@ -20,4 +20,4 @@ EXPOSE 4001
 
 # Start the app using the compiled JavaScript
 # CMD ["node", "dist/server.js"]  
-CMD ["npm", "run","dev"]  
+CMD ["npm", "run","dev"]

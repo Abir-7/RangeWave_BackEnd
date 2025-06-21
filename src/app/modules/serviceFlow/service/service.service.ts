@@ -3,7 +3,7 @@ import { status } from "http-status";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import mongoose, { model, PipelineStage } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { ExtraWork, Service } from "./service.model";
+import { Service } from "./service.model";
 import { IService, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 
@@ -278,10 +278,11 @@ const hireMechanic = async (
 
   const paymentIntent = await StripeService.createPaymentIntent(
     data.bidId,
-    data.serviceId
+    data.serviceId,
+    false
   );
 
-  if (paymentIntent.client_secret) {
+  if (paymentIntent && paymentIntent.client_secret) {
     const datas = await Payment.findOne({
       ...data,
     });
@@ -756,8 +757,8 @@ const getAllRequestedService = async () => {
   return data;
 };
 
-const changeServiceStatus = async (bId: string) => {
-  const bidData = await Bid.findById(bId);
+const changeServiceStatus = async (sId: string) => {
+  const bidData = await Bid.findOne({ reqServiceId: sId });
 
   if (!bidData) {
     throw new AppError(status.NOT_FOUND, "Bid data not found.");
@@ -781,7 +782,7 @@ const changeServiceStatus = async (bId: string) => {
   const newData = await serviceData.save();
 
   const io = getSocket();
-  io.emit("status", { serviceId: serviceData._id });
+  io.emit("service-status", { serviceId: serviceData._id });
   return newData;
 };
 
@@ -836,27 +837,10 @@ const seeCurrentServiceProgress = async (sId: string) => {
         select:
           "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
       },
-    });
+    })
+    .lean();
 
   return serviceData;
-};
-
-//!------------------------------ Extra work ---------------------------------
-
-const reqForExtraWork = async (
-  sId: string,
-  data: {
-    price: number;
-    issue: string;
-    description: string;
-  }
-) => {
-  const serviceData = await Service.findById(sId);
-  if (!serviceData) {
-    throw new AppError(status.NOT_FOUND, "Service not found");
-  }
-  const extraWork = await ExtraWork.create({ ...data, reqServiceId: sId });
-  return extraWork;
 };
 
 //-------------------------------------------------------------------------------------Api for socket -----------------------------------------------------------------
@@ -1008,7 +992,7 @@ export const ServiceService = {
   hireMechanic,
   cancelService,
   seeServiceDetails,
-  reqForExtraWork,
+
   getRunningService,
   getAllRequestedService,
   seeCurrentServiceProgress,

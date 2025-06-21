@@ -5,7 +5,11 @@ export interface IPayment {
   bidId: Types.ObjectId;
   serviceId: Types.ObjectId;
   status: PaymentStatus;
-  extraPay: { work: Types.ObjectId; txId: string }; //! todo make function for extrapay
+  extraPay: {
+    extraWorkId: Types.ObjectId;
+    txId: string;
+    status: PaymentStatus;
+  }; //! todo make function for extrapay
   transferId: string;
 }
 

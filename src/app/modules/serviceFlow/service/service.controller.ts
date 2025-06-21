@@ -43,8 +43,7 @@ const getBidListOfService = catchAsync(async (req: Request, res: Response) => {
   });
 });
 const hireMechanic = catchAsync(async (req: Request, res: Response) => {
-  const { bidId } = req.body;
-  const result = await ServiceService.hireMechanic(bidId, req.user.userId);
+  const result = await ServiceService.hireMechanic(req.body, req.user.userId);
   sendResponse(res, {
     success: true,
     statusCode: 200,
@@ -130,25 +129,13 @@ const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
 });
 
 const changeServiceStatus = catchAsync(async (req: Request, res: Response) => {
-  const { bId } = req.params;
+  const { sId } = req.params;
 
-  const result = await ServiceService.changeServiceStatus(bId);
+  const result = await ServiceService.changeServiceStatus(sId);
   sendResponse(res, {
     success: true,
     statusCode: 200,
     message: "Service status is changed successfully",
-    data: result,
-  });
-});
-
-const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
-  const { sId } = req.params;
-
-  const result = await ServiceService.reqForExtraWork(sId, req.body);
-  sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: "Service details is fetched successfully",
     data: result,
   });
 });
@@ -191,7 +178,6 @@ export const ServiceController = {
   cancelService,
 
   seeServiceDetails,
-  reqForExtraWork,
 
   getRunningService,
   seeCurrentServiceProgress,

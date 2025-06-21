@@ -17,7 +17,7 @@ io.emit("cencel", { serviceId: id });
 
 
 // when mechanic change status
-io.emit("status", { serviceId: serviceData._id }); 
+io.emit("service-status", { serviceId: serviceData._id }); 
 
 
 // when user mark status as complete
