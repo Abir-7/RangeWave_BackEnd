@@ -166,20 +166,8 @@ const acceptReqForExtrawork = async (sId: string) => {
   }
 };
 
-const saveExtraWorkPayment = async (sId: string, txId: string) => {
-  const saveData = await Payment.findOne({ serviceId: sId });
-  if (!saveData) {
-    throw new AppError(status.NOT_FOUND, "payment data not found.");
-  }
-
-  saveData.extraPay.status = PaymentStatus.HOLD;
-  saveData.extraPay.txId = txId;
-  return await saveData.save();
-};
-
 export const ExtraWorkService = {
   reqForExtraWork,
   acceptReqForExtrawork,
   rejectReqForExtrawork,
-  saveExtraWorkPayment,
 };

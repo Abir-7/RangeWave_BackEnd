@@ -8,12 +8,12 @@ router.post(
   auth("MECHANIC"),
   StripeController.createAndConnect
 );
-// router.post(
-//   "/create-payment-intent",
-//   auth("USER"),
-//   StripeController.createPaymentIntent
-// );
 
 router.post("/save-payment", auth("USER"), StripeController.savePaymentData);
+router.post(
+  "/save-extra-work-payment",
+  auth("USER"),
+  StripeController.saveExtraWorkPayment
+);
 router.post("/refund-payment", auth("ADMIN"), StripeController.refundPayment);
 export const StripeRoute = router;

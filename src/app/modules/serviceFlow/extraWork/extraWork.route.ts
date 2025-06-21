@@ -8,4 +8,14 @@ router.post(
   auth("MECHANIC"),
   ExtraWorkController.reqForExtraWork
 );
+router.post(
+  "/reject-req-for-extrawork/:sId",
+  auth("USER"),
+  ExtraWorkController.rejectReqForExtrawork
+);
+router.post(
+  "/accept-req-for-extrawork/:sId",
+  auth("USER"),
+  ExtraWorkController.acceptReqForExtrawork
+);
 export const ExtraWorkRoute = router;

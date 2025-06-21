@@ -12,15 +12,6 @@ const createAndConnect = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
-// const createPaymentIntent = catchAsync(async (req: Request, res: Response) => {
-//   const result = await StripeService.createPaymentIntent(req.body.bidId);
-//   sendResponse(res, {
-//     success: true,
-//     statusCode: 200,
-//     message: "Success",
-//     data: result,
-//   });
-// });
 
 const savePaymentData = catchAsync(async (req: Request, res: Response) => {
   const result = await StripeService.savePaymentData(req.body, req.user.userId);
@@ -42,9 +33,23 @@ const refundPayment = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const saveExtraWorkPayment = catchAsync(async (req: Request, res: Response) => {
+  const result = await StripeService.saveExtraWorkPayment(
+    req.body.sId,
+    req.body.txId
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Success",
+    data: result,
+  });
+});
+
 export const StripeController = {
   createAndConnect,
-  // createPaymentIntent,
+
   savePaymentData,
   refundPayment,
+  saveExtraWorkPayment,
 };

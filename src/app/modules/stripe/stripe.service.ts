@@ -49,55 +49,6 @@ const createAndConnect = async (mechanicEmail: string) => {
   return { url: accountLink.url, accountId: account.id };
 };
 
-// its only use when hire mecanic function is call is service.service.ts file
-const createPaymentIntent = async (
-  bidId: string,
-  serviceId: string,
-  isForExtraWork: boolean = false
-) => {
-  if (isForExtraWork === false) {
-    const bidData = await Bid.findOne({ _id: bidId, reqServiceId: serviceId });
-
-    if (!bidData) {
-      throw new AppError(status.NOT_FOUND, "Bid data not found");
-    }
-
-    const convertedAmount = bidData?.price * 100;
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: convertedAmount,
-      currency: "usd",
-      payment_method_types: ["card"],
-      metadata: {
-        bidId,
-      },
-    });
-
-    return { client_secret: paymentIntent.client_secret };
-  }
-  if (isForExtraWork === true) {
-    const bidData = await ExtraWork.findOne({
-      bidId: bidId,
-      reqServiceId: serviceId,
-    });
-
-    if (!bidData) {
-      throw new AppError(status.NOT_FOUND, "Bid data not found");
-    }
-
-    const convertedAmount = bidData.price * 100;
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: convertedAmount,
-      currency: "usd",
-      payment_method_types: ["card"],
-      metadata: {
-        bidId,
-      },
-    });
-
-    return { client_secret: paymentIntent.client_secret };
-  }
-};
-
 const savePaymentData = async (
   data: { txId: string; bidId: string; serviceId: string },
   userId: string
@@ -214,6 +165,17 @@ const refundPayment = async (
   return refund;
 };
 
+const saveExtraWorkPayment = async (sId: string, txId: string) => {
+  const saveData = await Payment.findOne({ serviceId: sId });
+  if (!saveData) {
+    throw new AppError(status.NOT_FOUND, "payment data not found.");
+  }
+
+  saveData.extraPay.status = PaymentStatus.HOLD;
+  saveData.extraPay.txId = txId;
+  return await saveData.save();
+};
+
 // const getExpressAccountLoginLink = async (userId: string) => {
 //   const userData = await MechanicProfile.findOne({ user: userId });
 
@@ -226,9 +188,59 @@ const refundPayment = async (
 //   return loginLink.url;
 // };
 
+// its only use when hire mecanic function is call is service.service.ts file
+const createPaymentIntent = async (
+  bidId: string,
+  serviceId: string,
+  isForExtraWork: boolean = false
+) => {
+  if (isForExtraWork === false) {
+    const bidData = await Bid.findOne({ _id: bidId, reqServiceId: serviceId });
+
+    if (!bidData) {
+      throw new AppError(status.NOT_FOUND, "Bid data not found");
+    }
+
+    const convertedAmount = bidData?.price * 100;
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: convertedAmount,
+      currency: "usd",
+      payment_method_types: ["card"],
+      metadata: {
+        bidId,
+      },
+    });
+
+    return { client_secret: paymentIntent.client_secret };
+  }
+  if (isForExtraWork === true) {
+    const bidData = await ExtraWork.findOne({
+      bidId: bidId,
+      reqServiceId: serviceId,
+    });
+
+    if (!bidData) {
+      throw new AppError(status.NOT_FOUND, "Bid data not found");
+    }
+
+    const convertedAmount = bidData.price * 100;
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: convertedAmount,
+      currency: "usd",
+      payment_method_types: ["card"],
+      metadata: {
+        bidId,
+      },
+    });
+
+    return { client_secret: paymentIntent.client_secret };
+  }
+};
+
 export const StripeService = {
   createAndConnect,
   createPaymentIntent,
   savePaymentData,
   refundPayment,
+  saveExtraWorkPayment,
 };

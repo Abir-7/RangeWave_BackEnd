@@ -15,6 +15,36 @@ const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const rejectReqForExtrawork = catchAsync(
+  async (req: Request, res: Response) => {
+    const { sId } = req.params;
+
+    const result = await ExtraWorkService.rejectReqForExtrawork(sId);
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Request for extra work is rejected",
+      data: result,
+    });
+  }
+);
+
+const acceptReqForExtrawork = catchAsync(
+  async (req: Request, res: Response) => {
+    const { sId } = req.params;
+
+    const result = await ExtraWorkService.acceptReqForExtrawork(sId);
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Request for extra work is accepted.",
+      data: result,
+    });
+  }
+);
+
 export const ExtraWorkController = {
   reqForExtraWork,
+  rejectReqForExtrawork,
+  acceptReqForExtrawork,
 };
