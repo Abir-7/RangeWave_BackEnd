@@ -9,7 +9,7 @@ io.emit("new-bid", { serviceId: saveBid._id });
 
 
 // when save payment
-io.emit("new-hire", { bidId }) 
+io.emit("new-hire", { paymentId: newPaymentData._id });
 
 
 // when cencel a service

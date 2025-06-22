@@ -14,7 +14,7 @@ export interface IService {
     }; // [longitude, latitude]
   };
 
-  extraWork: Types.ObjectId; //! todo make function for extrapay
+  extraWork: Types.ObjectId;
   schedule: {
     isSchedule: boolean;
     date: Date;

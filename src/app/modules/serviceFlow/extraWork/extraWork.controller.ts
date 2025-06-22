@@ -4,9 +4,9 @@ import sendResponse from "../../../utils/sendResponse";
 import { ExtraWorkService } from "./extraWork.service";
 
 const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
-  const { sId } = req.params;
+  const { idData, data } = req.body;
 
-  const result = await ExtraWorkService.reqForExtraWork(sId, req.body);
+  const result = await ExtraWorkService.reqForExtraWork(idData, data);
   sendResponse(res, {
     success: true,
     statusCode: 200,

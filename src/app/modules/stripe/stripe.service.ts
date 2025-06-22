@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../errors/AppError";
@@ -119,7 +119,7 @@ const savePaymentData = async (
     }
 
     const io = getSocket();
-    io.emit("new-hire", { bidId });
+    io.emit("new-hire", { paymentId: newPaymentData._id });
 
     // Commit transaction
     await session.commitTransaction();
@@ -136,20 +136,9 @@ const savePaymentData = async (
   }
 };
 
-const refundPayment = async (
-  bidId: string | Types.ObjectId,
-  session?: mongoose.ClientSession
-) => {
-  const bidData = await Payment.findOne({ bidId: bidId }).session(
-    session ?? null
-  );
-
-  if (!bidData || !bidData.txId) {
-    throw new AppError(status.BAD_REQUEST, "txId not found.");
-  }
-
+const refundPayment = async (txId: string) => {
   const refund = await stripe.refunds.create({
-    payment_intent: bidData.txId,
+    payment_intent: txId,
   });
 
   if (refund.status !== "succeeded") {
@@ -158,9 +147,6 @@ const refundPayment = async (
       "Refund not successful, status: " + refund.status
     );
   }
-
-  bidData.status = PaymentStatus.REFUNDED;
-  await bidData.save({ session });
 
   return refund;
 };

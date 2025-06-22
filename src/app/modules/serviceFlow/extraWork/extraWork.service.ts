@@ -13,7 +13,10 @@ import Payment from "../../stripe/payment.model";
 import { PaymentStatus } from "../../stripe/payment.interface";
 
 const reqForExtraWork = async (
-  sId: string,
+  idData: {
+    sId: string;
+    bId: string;
+  },
   data: {
     price: number;
     issue: string;
@@ -24,7 +27,7 @@ const reqForExtraWork = async (
   session.startTransaction();
 
   try {
-    const serviceData = await Service.findById(sId).session(session);
+    const serviceData = await Service.findById(idData.sId).session(session);
 
     if (!serviceData) {
       throw new AppError(status.NOT_FOUND, "Service not found");
@@ -37,16 +40,19 @@ const reqForExtraWork = async (
       );
     }
 
-    const extraWork = await ExtraWork.create([{ ...data, reqServiceId: sId }], {
-      session,
-    });
+    const extraWork = await ExtraWork.create(
+      [{ ...data, reqServiceId: idData.sId, bidId: idData.bId }],
+      {
+        session,
+      }
+    );
 
     serviceData.extraWork = extraWork[0]._id;
     await serviceData.save({ session });
 
     const io = getSocket();
     // socket-emit
-    io.emit("extra-work", { serviceId: sId });
+    io.emit("extra-work", { serviceId: idData.sId });
 
     await session.commitTransaction();
     session.endSession();

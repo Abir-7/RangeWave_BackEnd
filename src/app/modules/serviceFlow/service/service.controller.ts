@@ -54,9 +54,9 @@ const hireMechanic = catchAsync(async (req: Request, res: Response) => {
 
 const markServiceAsComplete = catchAsync(
   async (req: Request, res: Response) => {
-    const { sId } = req.params;
-    console.log(sId);
-    const result = await ServiceService.markServiceAsComplete(sId);
+    const { pId } = req.params;
+
+    const result = await ServiceService.markServiceAsComplete(pId);
     sendResponse(res, {
       success: true,
       statusCode: 200,
@@ -81,7 +81,7 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
 const seeCurrentServiceProgress = catchAsync(
   async (req: Request, res: Response) => {
     const result = await ServiceService.seeCurrentServiceProgress(
-      req.params.id
+      req.params.pId
     );
     sendResponse(res, {
       success: true,
@@ -93,9 +93,9 @@ const seeCurrentServiceProgress = catchAsync(
 );
 
 const cancelService = catchAsync(async (req: Request, res: Response) => {
-  const { sId } = req.params;
+  const { pId } = req.params;
   const serviceData = req.body;
-  const result = await ServiceService.cancelService(sId, serviceData);
+  const result = await ServiceService.cancelService(pId, serviceData);
   sendResponse(res, {
     success: true,
     statusCode: 200,
@@ -129,9 +129,9 @@ const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
 });
 
 const changeServiceStatus = catchAsync(async (req: Request, res: Response) => {
-  const { sId } = req.params;
+  const { pId } = req.params;
 
-  const result = await ServiceService.changeServiceStatus(sId);
+  const result = await ServiceService.changeServiceStatus(pId);
   sendResponse(res, {
     success: true,
     statusCode: 200,

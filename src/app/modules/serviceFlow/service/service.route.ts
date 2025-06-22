@@ -21,8 +21,9 @@ router.get(
 );
 
 router.patch("/hire-mechanic", auth("USER"), ServiceController.hireMechanic);
+
 router.patch(
-  "/mark-service-as-complete/:sId",
+  "/mark-service-as-complete/:pId",
   auth("USER"),
   ServiceController.markServiceAsComplete
 );
@@ -41,7 +42,7 @@ router.get(
 );
 
 router.patch(
-  "/change-service-status/:sId",
+  "/change-service-status/:pId",
   auth("MECHANIC"),
   ServiceController.changeServiceStatus
 );
@@ -54,13 +55,13 @@ router.get(
 );
 
 router.get(
-  "/see-running-service-progress/:id",
+  "/see-running-service-progress/:pId",
   auth("MECHANIC", "USER"),
   ServiceController.seeCurrentServiceProgress
 );
 
 router.patch(
-  "/cencel-service/:sId",
+  "/cencel-service/:pId",
   auth("USER", "MECHANIC"),
   ServiceController.cancelService
 );

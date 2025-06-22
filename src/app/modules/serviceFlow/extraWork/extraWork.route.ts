@@ -4,7 +4,7 @@ import { ExtraWorkController } from "./extraWork.controller";
 
 const router = Router();
 router.post(
-  "/req-for-extra-work/:sId",
+  "/req-for-extra-work",
   auth("MECHANIC"),
   ExtraWorkController.reqForExtraWork
 );

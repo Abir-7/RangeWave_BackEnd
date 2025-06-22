@@ -317,58 +317,18 @@ const hireMechanic = async (
   };
 };
 
-const cancelService = async (
-  id: string,
-  serviceData: Partial<IService>
-): Promise<IService> => {
+const markServiceAsComplete = async (pId: string) => {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    const paymentData = await Payment.findById(pId);
 
-    // 1. Update the service document inside the transaction
-    const service = await Service.findByIdAndUpdate(id, serviceData, {
-      new: true,
-      session, // Important: pass session here
-    });
-
-    if (!service) {
-      throw new Error("Service not found");
+    if (!paymentData) {
+      throw new AppError(status.NOT_FOUND, "Payment data not found.");
     }
 
-    // 2. Find the related bid inside the transaction
-    const bid = await Bid.findOne({ reqServiceId: id }).session(session);
-
-    if (!bid) {
-      throw new Error("Bid data not found");
-    }
-
-    // 3. Call Stripe refund (external system)
-    // Note: This is NOT a DB operation, so it can't be part of the DB transaction
-    await StripeService.refundPayment(bid._id, session);
-
-    const io = getSocket();
-    io.emit("cencel", { serviceId: id });
-
-    // 4. Commit transaction only after refund succeeds
-    await session.commitTransaction();
-    session.endSession();
-
-    return service;
-  } catch (error) {
-    // Rollback on error
-    await session.abortTransaction();
-    session.endSession();
-    throw error;
-  }
-};
-
-const markServiceAsComplete = async (sId: string) => {
-  const session = await mongoose.startSession();
-
-  try {
     const serviceData = await Service.findOne({
-      _id: sId,
+      _id: paymentData.serviceId,
       status: Status.COMPLETED,
     });
 
@@ -697,6 +657,89 @@ const getRunningService = async (userId: string) => {
   }
   throw new AppError(status.NOT_FOUND, "No active service found.");
 };
+const cancelService = async (
+  pId: string,
+  serviceData: { cancelReson: string }
+): Promise<IService> => {
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const paymentData = await Payment.findOne({ _id: pId });
+
+    if (!paymentData || !paymentData.txId) {
+      throw new AppError(status.NOT_FOUND, "Payment data not found");
+    }
+
+    // 2. Find the related bid inside the transaction
+    const bid = await Bid.findOne({ _id: paymentData?.bidId }).session(session);
+
+    if (!bid) {
+      throw new Error("Bid data not found");
+    }
+
+    const service = await Service.findByIdAndUpdate(
+      paymentData?.serviceId,
+      { ...serviceData, status: Status.CANCELLED },
+      {
+        new: true,
+        session,
+      }
+    );
+
+    if (!service) {
+      throw new Error("Service not found");
+    }
+
+    paymentData.status = PaymentStatus.REFUNDED;
+    await paymentData.save({ session });
+
+    await StripeService.refundPayment(paymentData.txId);
+
+    const io = getSocket();
+    io.emit("cencel", { paymentId: pId });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return service;
+  } catch (error) {
+    // Rollback on error
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};
+const seeCurrentServiceProgress = async (pId: string) => {
+  const serviceData = await Payment.findOne({ _id: pId })
+    .populate({
+      path: "serviceId",
+      select: " -updatedAt  -createdAt",
+      populate: {
+        path: "user",
+        model: "UserProfile",
+        localField: "user",
+        foreignField: "user",
+        select: "-location   -dateOfBirth  -carInfo  -updatedAt  -createdAt",
+      },
+    })
+    .populate({
+      path: "bidId",
+      select: "-createdAt -updatedAt -__v",
+      populate: {
+        path: "mechanicId",
+        model: "MechanicProfile",
+        localField: "mechanicId",
+        foreignField: "user",
+        select:
+          "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
+      },
+    })
+    .lean();
+
+  return serviceData;
+};
 
 //! ----------------------------for mechanics-------------------------------//
 
@@ -757,8 +800,14 @@ const getAllRequestedService = async () => {
   return data;
 };
 
-const changeServiceStatus = async (sId: string) => {
-  const bidData = await Bid.findOne({ reqServiceId: sId });
+const changeServiceStatus = async (pId: string) => {
+  const paymentData = await Payment.findById(pId);
+
+  if (!paymentData) {
+    throw new AppError(status.NOT_FOUND, "Payment data not found.");
+  }
+
+  const bidData = await Bid.findOne({ _id: paymentData.bidId });
 
   if (!bidData) {
     throw new AppError(status.NOT_FOUND, "Bid data not found.");
@@ -782,7 +831,7 @@ const changeServiceStatus = async (sId: string) => {
   const newData = await serviceData.save();
 
   const io = getSocket();
-  io.emit("service-status", { serviceId: serviceData._id });
+  io.emit("service-status", { paymentId: pId });
   return newData;
 };
 
@@ -811,36 +860,6 @@ const seeServiceDetails = async (sId: string) => {
       coordinates: service.location.coordinates.coordinates,
     },
   };
-};
-
-const seeCurrentServiceProgress = async (sId: string) => {
-  const serviceData = await Payment.findOne({ serviceId: sId })
-    .populate({
-      path: "serviceId",
-      select: " -updatedAt  -createdAt",
-      populate: {
-        path: "user",
-        model: "UserProfile",
-        localField: "user",
-        foreignField: "user",
-        select: "-location   -dateOfBirth  -carInfo  -updatedAt  -createdAt",
-      },
-    })
-    .populate({
-      path: "bidId",
-      select: "-createdAt -updatedAt -__v",
-      populate: {
-        path: "mechanicId",
-        model: "MechanicProfile",
-        localField: "mechanicId",
-        foreignField: "user",
-        select:
-          "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
-      },
-    })
-    .lean();
-
-  return serviceData;
 };
 
 //-------------------------------------------------------------------------------------Api for socket -----------------------------------------------------------------
