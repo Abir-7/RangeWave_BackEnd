@@ -1,10 +1,11 @@
+import { ExtraWork } from "./extraWork.model";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../../errors/AppError";
 import { Service } from "../service/service.model";
 import mongoose from "mongoose";
 import { getSocket } from "../../../socket/socket";
-import { ExtraWork } from "./extraWork.model";
+
 import { Status } from "../service/service.interface";
 import { ExtraWorkStatus } from "./extraWork.interface";
 
@@ -32,7 +33,12 @@ const reqForExtraWork = async (
     if (!serviceData) {
       throw new AppError(status.NOT_FOUND, "Service not found");
     }
-
+    if (serviceData.extraWork) {
+      throw new AppError(
+        status.BAD_REQUEST,
+        "Already requested for extra work"
+      );
+    }
     if (serviceData.status !== Status.WORKING) {
       throw new AppError(
         status.BAD_REQUEST,
@@ -65,26 +71,25 @@ const reqForExtraWork = async (
   }
 };
 
-const rejectReqForExtrawork = async (sId: string) => {
-  const [service, extraWork] = await Promise.all([
-    Service.findById(sId),
-    ExtraWork.findOne({ reqServiceId: sId }),
-  ]);
+const rejectReqForExtrawork = async (pId: string) => {
+  const paymentData = await Payment.findById(pId);
 
-  if (!service) {
-    throw new AppError(status.NOT_FOUND, "Service not found");
+  if (!paymentData || !paymentData.serviceId) {
+    throw new AppError(status.NOT_FOUND, "Payment data not found");
   }
+
+  const serviceData = await Service.findById(paymentData.serviceId);
+
+  if (!serviceData || !serviceData.extraWork) {
+    throw new AppError(status.NOT_FOUND, "Service data not found");
+  }
+
+  const extraWork = await ExtraWork.findById(serviceData.extraWork);
 
   if (!extraWork) {
-    throw new AppError(status.NOT_FOUND, "Extra work request not found");
+    throw new AppError(status.NOT_FOUND, "Extra work data not found");
   }
 
-  if (extraWork._id.toString() !== service.extraWork?.toString()) {
-    throw new AppError(
-      status.BAD_REQUEST,
-      "Extra work request doesn't match the service"
-    );
-  }
   if (extraWork.status !== ExtraWorkStatus.WAITING) {
     throw new AppError(
       status.NOT_FOUND,
@@ -94,20 +99,24 @@ const rejectReqForExtrawork = async (sId: string) => {
 
   extraWork.status = ExtraWorkStatus.REJECTED;
   const io = getSocket();
-  io.emit("extra-work-reject", { serviceId: sId });
+  io.emit("extra-work-reject", { paymentId: pId });
   return await extraWork.save();
 };
 
-const acceptReqForExtrawork = async (sId: string) => {
-  const [service, extraWork, paymentData] = await Promise.all([
-    Service.findById(sId),
-    ExtraWork.findOne({ reqServiceId: sId }),
-    Payment.findOne({ serviceId: sId }),
-  ]);
+const acceptReqForExtrawork = async (pId: string) => {
+  const paymentData = await Payment.findById(pId);
+
+  if (!paymentData) {
+    throw new AppError(status.NOT_FOUND, "Payment data not found");
+  }
+
+  const service = await Service.findById(paymentData.serviceId);
 
   if (!service) {
     throw new AppError(status.NOT_FOUND, "Service not found");
   }
+
+  const extraWork = await ExtraWork.findById(service.extraWork);
 
   if (!extraWork) {
     throw new AppError(status.NOT_FOUND, "Extra work request not found");
@@ -152,10 +161,15 @@ const acceptReqForExtrawork = async (sId: string) => {
     );
   }
 
+  const paymentIntentData = {
+    bidId: extraWork.bidId,
+    isForExtraWork: true,
+    bidPrice: extraWork.price,
+    serviceId: extraWork.reqServiceId,
+  };
+
   const paymentIntent = await StripeService.createPaymentIntent(
-    extraWork.bidId.toString(),
-    extraWork.reqServiceId.toString(),
-    true
+    paymentIntentData
   );
 
   paymentData.extraPay.status = PaymentStatus.UNPAID;

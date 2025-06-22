@@ -47,7 +47,7 @@ const hireMechanic = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     success: true,
     statusCode: 200,
-    message: "A mechanic is fired successfully",
+    message: "A mechanic is hired successfully",
     data: result,
   });
 });

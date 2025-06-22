@@ -8,13 +8,13 @@ router.post(
   auth("MECHANIC"),
   ExtraWorkController.reqForExtraWork
 );
-router.post(
-  "/reject-req-for-extrawork/:sId",
+router.patch(
+  "/reject-req-for-extrawork/:pId",
   auth("USER"),
   ExtraWorkController.rejectReqForExtrawork
 );
-router.post(
-  "/accept-req-for-extrawork/:sId",
+router.patch(
+  "/accept-req-for-extrawork/:pId",
   auth("USER"),
   ExtraWorkController.acceptReqForExtrawork
 );

@@ -263,12 +263,15 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 
 // call payment intent function from stripe.service.ts file
 
-const hireMechanic = async (
-  data: { bidId: string; serviceId: string },
-  userId: string
-) => {
+const hireMechanic = async (data: { bidId: string }, userId: string) => {
+  const bidData = await Bid.findById(data.bidId);
+
+  if (!bidData) {
+    throw new AppError(status.NOT_FOUND, "Bid data not found");
+  }
+
   const isServiceExist = await Service.findOne({
-    _id: data.serviceId,
+    _id: bidData.reqServiceId,
     user: userId,
   });
 
@@ -276,10 +279,15 @@ const hireMechanic = async (
     throw new AppError(status.NOT_FOUND, "Service not found.");
   }
 
+  const paymentIntentData = {
+    bidId: bidData._id,
+    isForExtraWork: false,
+    bidPrice: bidData.price,
+    serviceId: bidData.reqServiceId,
+  };
+
   const paymentIntent = await StripeService.createPaymentIntent(
-    data.bidId,
-    data.serviceId,
-    false
+    paymentIntentData
   );
 
   if (paymentIntent && paymentIntent.client_secret) {
@@ -290,7 +298,7 @@ const hireMechanic = async (
       await Payment.create({
         bidId: data.bidId,
         status: PaymentStatus.UNPAID,
-        serviceId: data.serviceId,
+        serviceId: bidData.reqServiceId,
       });
     }
 
@@ -313,93 +321,105 @@ const hireMechanic = async (
   return {
     bidId: data.bidId,
     paymentIntent,
-    serviceId: data.serviceId,
+    serviceId: bidData.reqServiceId,
   };
 };
 
 const markServiceAsComplete = async (pId: string) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
-    const paymentData = await Payment.findById(pId);
-
-    if (!paymentData) {
+    // 1. Get initial payment
+    const paymentData = await Payment.findById(pId).session(session);
+    if (!paymentData)
       throw new AppError(status.NOT_FOUND, "Payment data not found.");
-    }
 
+    // 2. Get associated service
     const serviceData = await Service.findOne({
       _id: paymentData.serviceId,
       status: Status.COMPLETED,
-    });
-
-    if (!serviceData) {
+    }).session(session);
+    if (!serviceData)
       throw new AppError(status.NOT_FOUND, "Service data not found.");
-    }
 
-    if (serviceData.isStatusAccepted !== false) {
+    if (serviceData.isStatusAccepted) {
       throw new AppError(
         status.BAD_REQUEST,
-        "Service failed to mark as completed."
+        "Service already marked as completed."
       );
     }
 
-    serviceData.isStatusAccepted = true; //--------------------
-
+    serviceData.isStatusAccepted = true;
     await serviceData.save({ session });
 
+    // 3. Get bid data
     const bidData = await Bid.findOne({
       reqServiceId: serviceData._id,
     }).session(session);
+    if (!bidData) throw new AppError(status.NOT_FOUND, "Bid data not found");
 
-    if (!bidData) {
-      throw new Error("Bid data not found");
-    }
-
+    // 4. Get full payment record
     const paymentRecord = await Payment.findOne({
-      bidId: bidData?._id,
+      bidId: bidData._id,
     }).session(session);
-
-    if (!paymentRecord || !paymentRecord.txId) {
-      throw new Error("Payment or txId not found");
+    if (!paymentRecord?.txId) {
+      throw new AppError(status.BAD_REQUEST, "Payment or txId not found");
     }
 
+    // 5. Get mechanic profile & Stripe ID
     const mechanicProfile = await MechanicProfile.findById(
       bidData.mechanicId
     ).session(session);
-
-    if (!mechanicProfile || !mechanicProfile.stripeAccountId) {
-      throw new Error("Mechanic Stripe ID missing");
+    if (!mechanicProfile?.stripeAccountId) {
+      throw new AppError(status.BAD_REQUEST, "Mechanic Stripe ID missing");
     }
-
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      paymentRecord.txId
-    );
-    if (paymentIntent.status !== "succeeded") {
-      throw new Error("Payment not successful");
-    }
-
     const stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
 
-    const amountToTransfer = Math.floor(paymentIntent.amount_received * 0.9);
+    // 6. Get main payment intent
+    const mainIntent = await stripe.paymentIntents.retrieve(paymentRecord.txId);
+    if (mainIntent.status !== "succeeded") {
+      throw new AppError(status.BAD_REQUEST, "Main payment not successful");
+    }
 
+    let extraAmount = 0;
+
+    // 7. Optional: Get extra work payment intent
+    if (
+      paymentRecord.extraPay?.status === PaymentStatus.HOLD &&
+      paymentRecord.extraPay?.txId
+    ) {
+      const extraIntent = await stripe.paymentIntents.retrieve(
+        paymentRecord.extraPay.txId
+      );
+      if (extraIntent?.status === "succeeded") {
+        extraAmount = extraIntent.amount_received;
+      }
+    }
+
+    // 8. Calculate 90% from total (main + extra)
+    const totalReceived = mainIntent.amount_received + extraAmount;
+    const amountToTransfer = Math.floor(totalReceived * 0.9); // 10% fee once
+
+    // 9. Transfer to mechanic
     const transfer = await stripe.transfers.create({
       amount: amountToTransfer,
-      currency: paymentIntent.currency,
+      currency: mainIntent.currency,
       destination: stripeAccountId,
       description: `Payout for bid ${bidData._id}`,
     });
 
-    if (!transfer.id) {
-      throw new AppError(status.BAD_REQUEST, "Faild to transfer payment");
+    if (!transfer?.id) {
+      throw new AppError(status.BAD_REQUEST, "Failed to transfer payment");
     }
 
+    // 10. Update payment status
     paymentRecord.status = PaymentStatus.PAID;
     paymentRecord.transferId = transfer.id;
     await paymentRecord.save({ session });
 
-    const io = getSocket();
-
-    io.emit("markAsComplete", { bidId: bidData._id });
+    // 11. Emit socket event
+    getSocket().emit("markAsComplete", { bidId: bidData._id });
 
     await session.commitTransaction();
     session.endSession();
@@ -408,7 +428,7 @@ const markServiceAsComplete = async (pId: string) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    throw new Error(error as any);
+    throw new Error((error as Error).message || "Unknown error");
   }
 };
 

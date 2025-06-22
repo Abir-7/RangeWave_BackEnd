@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose from "mongoose";
+import mongoose, { Types } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../errors/AppError";
@@ -17,7 +17,6 @@ import { PaymentStatus } from "./payment.interface";
 import { Service } from "../serviceFlow/service/service.model";
 import { createRoomAfterHire } from "../chat/room/room.service";
 import { getSocket } from "../../socket/socket";
-import { ExtraWork } from "../serviceFlow/extraWork/extraWork.model";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
@@ -175,47 +174,37 @@ const saveExtraWorkPayment = async (sId: string, txId: string) => {
 // };
 
 // its only use when hire mecanic function is call is service.service.ts file
-const createPaymentIntent = async (
-  bidId: string,
-  serviceId: string,
-  isForExtraWork: boolean = false
-) => {
-  if (isForExtraWork === false) {
-    const bidData = await Bid.findOne({ _id: bidId, reqServiceId: serviceId });
-
-    if (!bidData) {
-      throw new AppError(status.NOT_FOUND, "Bid data not found");
-    }
-
-    const convertedAmount = bidData?.price * 100;
+const createPaymentIntent = async (data: {
+  bidId: string | Types.ObjectId;
+  isForExtraWork: boolean;
+  bidPrice: number;
+  serviceId: string | Types.ObjectId;
+}) => {
+  if (data.isForExtraWork === false) {
+    const convertedAmount = data.bidPrice * 100;
     const paymentIntent = await stripe.paymentIntents.create({
       amount: convertedAmount,
       currency: "usd",
       payment_method_types: ["card"],
       metadata: {
-        bidId,
+        bidId: data.bidId.toString(),
+        isForExtraWork: "no",
+        serviceId: data.serviceId.toString(),
       },
     });
 
     return { client_secret: paymentIntent.client_secret };
   }
-  if (isForExtraWork === true) {
-    const bidData = await ExtraWork.findOne({
-      bidId: bidId,
-      reqServiceId: serviceId,
-    });
-
-    if (!bidData) {
-      throw new AppError(status.NOT_FOUND, "Bid data not found");
-    }
-
-    const convertedAmount = bidData.price * 100;
+  if (data.isForExtraWork === true) {
+    const convertedAmount = data.bidPrice * 100;
     const paymentIntent = await stripe.paymentIntents.create({
       amount: convertedAmount,
       currency: "usd",
       payment_method_types: ["card"],
       metadata: {
-        bidId,
+        bidId: data.bidId.toString(),
+        isForExtraWork: "yes",
+        serviceId: data.serviceId.toString(),
       },
     });
 

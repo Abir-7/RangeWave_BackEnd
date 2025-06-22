@@ -17,9 +17,9 @@ const reqForExtraWork = catchAsync(async (req: Request, res: Response) => {
 
 const rejectReqForExtrawork = catchAsync(
   async (req: Request, res: Response) => {
-    const { sId } = req.params;
+    const { pId } = req.params;
 
-    const result = await ExtraWorkService.rejectReqForExtrawork(sId);
+    const result = await ExtraWorkService.rejectReqForExtrawork(pId);
     sendResponse(res, {
       success: true,
       statusCode: 200,
@@ -31,9 +31,9 @@ const rejectReqForExtrawork = catchAsync(
 
 const acceptReqForExtrawork = catchAsync(
   async (req: Request, res: Response) => {
-    const { sId } = req.params;
+    const { pId } = req.params;
 
-    const result = await ExtraWorkService.acceptReqForExtrawork(sId);
+    const result = await ExtraWorkService.acceptReqForExtrawork(pId);
     sendResponse(res, {
       success: true,
       statusCode: 200,
