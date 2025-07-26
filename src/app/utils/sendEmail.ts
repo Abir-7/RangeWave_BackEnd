@@ -22,7 +22,7 @@ export async function sendEmail(email: string, subject: string, text: string) {
     });
 
     const info = await transporter.sendMail({
-      from: `"AiFinanceHub" ${appConfig.email.from}`, // Sender address
+      from: `"Wrenchwave" ${appConfig.email.from}`, // Sender address
       to: email, // Recipient's email
       subject: `${subject}`,
       text: text,
@@ -46,7 +46,7 @@ export async function sendEmail(email: string, subject: string, text: string) {
               max-width: 600px;
               margin: 20px auto;
               padding: 20px;
-              border: 1px solid #ccc;
+              border: 1px solid #ffa053ff;
               border-radius: 10px;
               background-color: #fff;
               box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -54,7 +54,7 @@ export async function sendEmail(email: string, subject: string, text: string) {
     
             /* Header styles */
             .header {
-              background-color: #caccd1; /* New blue background */
+              background-color: #ffa053ff; /* New blue background */
               padding: 20px;
               border-radius: 10px 10px 0 0;
               color: #000000;
@@ -67,15 +67,16 @@ export async function sendEmail(email: string, subject: string, text: string) {
             /* Content styles */
             .content {
               padding: 20px;
-              text-align: left;
-              font-size: 16px;
+              text-align: center;
+              font-size: 20px;
               line-height: 1.6;
               color: #333;
+               font-weight: bold;
             }
     
             /* Footer styles */
             .footer {
-              background-color: #caccd1; /* New green background */
+              background-color: #ffa053ff; /* New green background */
               padding: 15px;
               border-radius: 0 0 10px 10px;
               text-align: center;
@@ -115,7 +116,7 @@ export async function sendEmail(email: string, subject: string, text: string) {
               <p>${text}</p>
             </div>
             <div class="footer">
-              <p>&copy; ${new Date().getFullYear()} Ticket Support. All rights reserved.</p>
+              <p>&copy; ${new Date().getFullYear()} Wrenchwave. All rights reserved.</p>
             </div>
           </div>
         </body>

@@ -166,6 +166,7 @@ const acceptReqForExtrawork = async (pId: string) => {
     isForExtraWork: true,
     bidPrice: extraWork.price,
     serviceId: extraWork.reqServiceId,
+    userId: String(service.user),
   };
 
   const paymentIntent = await StripeService.createPaymentIntent(
@@ -175,12 +176,12 @@ const acceptReqForExtrawork = async (pId: string) => {
   paymentData.extraPay.status = PaymentStatus.UNPAID;
   paymentData.extraPay.extraWorkId = extraWork._id;
 
-  if (paymentIntent && paymentIntent.client_secret) {
+  if (paymentIntent) {
     await paymentData.save();
 
     await extraWork.save();
 
-    return { client_secret: paymentIntent.client_secret };
+    return { paymentIntent };
   } else {
     throw new AppError(status.BAD_REQUEST, "failed to get client secret.");
   }

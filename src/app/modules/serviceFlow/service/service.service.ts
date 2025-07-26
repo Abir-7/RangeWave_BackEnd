@@ -54,31 +54,31 @@ const addServiceReq = async (
   const isScheduled = !!serviceData.schedule?.date;
 
   // 1. If this is a scheduled request, check if there's already a scheduled service today
-  if (isScheduled) {
-    const existingScheduled = await Service.findOne({
-      user: userId,
-      status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
-      "schedule.isSchedule": true,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
+  // if (isScheduled) {
+  //   const existingScheduled = await Service.findOne({
+  //     user: userId,
+  //     status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+  //     "schedule.isSchedule": true,
+  //     createdAt: { $gte: startOfDay, $lte: endOfDay },
+  //   });
 
-    if (existingScheduled) {
-      throw new Error("You already have a scheduled service request today.");
-    }
-  }
-  // 2. If this is an unscheduled request, check if there's already an unscheduled service today
-  else {
-    const existingUnscheduled = await Service.findOne({
-      user: userId,
-      status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
-      "schedule.isSchedule": false,
-      createdAt: { $gte: startOfDay, $lte: endOfDay },
-    });
+  //   if (existingScheduled) {
+  //     throw new Error("You already have a scheduled service request today.");
+  //   }
+  // }
+  // // 2. If this is an unscheduled request, check if there's already an unscheduled service today
+  // else {
+  //   const existingUnscheduled = await Service.findOne({
+  //     user: userId,
+  //     status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+  //     "schedule.isSchedule": false,
+  //     createdAt: { $gte: startOfDay, $lte: endOfDay },
+  //   });
 
-    if (existingUnscheduled) {
-      throw new Error("You already have an unscheduled service request today.");
-    }
-  }
+  //   if (existingUnscheduled) {
+  //     throw new Error("You already have an unscheduled service request today.");
+  //   }
+  // }
 
   // If no conflict, create the new service
   const service = await Service.create({
@@ -284,43 +284,16 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
     isForExtraWork: false,
     bidPrice: bidData.price,
     serviceId: bidData.reqServiceId,
+    userId,
   };
 
-  const paymentIntent = await StripeService.createPaymentIntent(
-    paymentIntentData
-  );
+  const result = await StripeService.createPaymentIntent(paymentIntentData);
 
-  if (paymentIntent && paymentIntent.client_secret) {
-    const datas = await Payment.findOne({
-      ...data,
-    });
-    if (!datas) {
-      await Payment.create({
-        bidId: data.bidId,
-        status: PaymentStatus.UNPAID,
-        serviceId: bidData.reqServiceId,
-      });
-    }
-
-    if (
-      datas &&
-      (datas.status === PaymentStatus.HOLD ||
-        datas.status === PaymentStatus.REFUNDED ||
-        datas.status === PaymentStatus.PAID ||
-        datas.status === PaymentStatus.CANCELLED)
-    ) {
-      throw new AppError(
-        status.BAD_REQUEST,
-        `Payment for this bid status is: ${datas.status}`
-      );
-    }
-  } else {
-    throw new AppError(status.BAD_REQUEST, "Failed to create client secret.");
-  }
+  // need to validate before payment done...if payment already done or not
 
   return {
     bidId: data.bidId,
-    paymentIntent,
+    result,
     serviceId: bidData.reqServiceId,
   };
 };

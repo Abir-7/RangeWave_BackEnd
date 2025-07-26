@@ -38,12 +38,13 @@ export const appConfig = {
   },
   stripe: {
     secret_key: process.env.STRIPE_SECRET_KEY,
+    webhook: process.env.STRIPE_WEBHOOK_SECRET,
   },
   encrypt: {
     s_key: process.env.ENCRYPTION_SECRET_KEY,
   },
-  redis: {
-    host: process.env.REDIS_HOST,
-    port: process.env.REDIS_PORT,
+
+  rabbitMq: {
+    url: process.env.RABBITMQ_URL,
   },
 };

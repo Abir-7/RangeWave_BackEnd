@@ -17,6 +17,9 @@ import { PaymentStatus } from "./payment.interface";
 import { Service } from "../serviceFlow/service/service.model";
 import { createRoomAfterHire } from "../chat/room/room.service";
 import { getSocket } from "../../socket/socket";
+import logger from "../../utils/logger";
+import Stripe from "stripe";
+import User from "../users/user/user.model";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
@@ -179,36 +182,119 @@ const createPaymentIntent = async (data: {
   isForExtraWork: boolean;
   bidPrice: number;
   serviceId: string | Types.ObjectId;
+  userId: string;
 }) => {
-  if (data.isForExtraWork === false) {
-    const convertedAmount = data.bidPrice * 100;
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: convertedAmount,
-      currency: "usd",
-      payment_method_types: ["card"],
+  const user = await User.findById(data.userId);
+
+  if (!user) throw new Error("User not found");
+
+  let stripeCustomerId = user.stripeCustomerId;
+
+  // 2. Create Stripe Customer if not exists
+  if (!stripeCustomerId) {
+    const customer = await stripe.customers.create({
+      email: user.email,
       metadata: {
-        bidId: data.bidId.toString(),
-        isForExtraWork: "no",
-        serviceId: data.serviceId.toString(),
+        userId: String(user._id),
       },
     });
 
-    return { client_secret: paymentIntent.client_secret };
+    stripeCustomerId = customer.id;
+
+    // 3. Save Stripe customer ID to your user record
+    user.stripeCustomerId = stripeCustomerId;
+    await user.save();
   }
-  if (data.isForExtraWork === true) {
-    const convertedAmount = data.bidPrice * 100;
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: convertedAmount,
-      currency: "usd",
-      payment_method_types: ["card"],
-      metadata: {
-        bidId: data.bidId.toString(),
-        isForExtraWork: "yes",
-        serviceId: data.serviceId.toString(),
-      },
-    });
 
-    return { client_secret: paymentIntent.client_secret };
+  // 4. Create Checkout Session linked to the Stripe customer
+  const convertedAmount = Math.round(data.bidPrice * 100);
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "payment",
+    customer: stripeCustomerId, // associate session with existing customer
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: data.isForExtraWork ? "Extra Work Payment" : "Bid Payment",
+          },
+          unit_amount: convertedAmount,
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      bidId: data.bidId.toString(),
+      isForExtraWork: data.isForExtraWork ? "yes" : "no",
+      serviceId: data.serviceId.toString(),
+      userId: data.userId,
+    },
+    success_url:
+      "https://yourdomain.com/payment-success?session_id={CHECKOUT_SESSION_ID}",
+    cancel_url: "https://yourdomain.com/payment-cancelled",
+  });
+
+  return { sessionId: session.id, url: session.url };
+};
+
+const stripeWebhook = async (rawBody: Buffer, sig: string) => {
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      appConfig.stripe.webhook as string
+    );
+  } catch (err) {
+    logger.error(`Webhook signature verification failed:${err}`);
+    throw new Error("Webhook signature verification failed.");
+  }
+  logger.info(event.type);
+  switch (event.type) {
+    case "checkout.session.completed": {
+      console.log("Hit");
+
+      const session = event.data.object as Stripe.Checkout.Session;
+
+      // Access metadata
+      const bidId = session.metadata?.bidId;
+      const isForExtraWork = session.metadata?.isForExtraWork;
+      const serviceId = session.metadata?.serviceId;
+
+      console.log(bidId, isForExtraWork, serviceId);
+
+      //      if (paymentIntent) {
+      //   const datas = await Payment.findOne({
+      //     ...data,
+      //   });
+
+      //   if (!datas) {
+      //     await Payment.create({
+      //       bidId: data.bidId,
+      //       status: PaymentStatus.UNPAID,
+      //       serviceId: bidData.reqServiceId,
+      //     });
+      //   }
+
+      //   if (
+      //     datas &&
+      //     (datas.status === PaymentStatus.HOLD ||
+      //       datas.status === PaymentStatus.REFUNDED ||
+      //       datas.status === PaymentStatus.PAID ||
+      //       datas.status === PaymentStatus.CANCELLED)
+      //   ) {
+      //     throw new AppError(
+      //       status.BAD_REQUEST,
+      //       `Payment for this bid status is: ${datas.status}`
+      //     );
+      //   }
+      // } else {
+      //   throw new AppError(status.BAD_REQUEST, "Failed to create client secret.");
+      // }
+    }
   }
 };
 
@@ -218,4 +304,5 @@ export const StripeService = {
   savePaymentData,
   refundPayment,
   saveExtraWorkPayment,
+  stripeWebhook,
 };

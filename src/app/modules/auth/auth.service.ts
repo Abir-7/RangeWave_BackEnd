@@ -16,8 +16,9 @@ import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model"
 import { startSession } from "mongoose";
 import { IUser } from "../users/user/user.interface";
 import { TUserRole } from "../../interface/auth.interface";
-import { emailQueue } from "../../bullMQ/queue/email.queue";
+
 import { UserProfile } from "../users/userProfile/userProfile.model";
+import { publishJob } from "../../rabbitMq/publisher";
 
 const createUser = async (
   data: {
@@ -34,8 +35,15 @@ const createUser = async (
   isExist = await User.findOne({ email: data.email });
 
   if (isExist?.isVerified === false) {
-    await User.findOneAndDelete({ email: data.email });
-    await UserProfile.findOneAndDelete({ email: data.email });
+    await User.findOneAndDelete({ email: isExist.email });
+
+    if (role === "MECHANIC") {
+      await MechanicProfile.findOneAndDelete({ email: isExist.email });
+    }
+    if (role === "USER") {
+      await UserProfile.findOneAndDelete({ email: isExist.email });
+    }
+
     isExist = null;
   }
 
@@ -55,7 +63,7 @@ const createUser = async (
     const userData = {
       email: data.email,
       password: hashedPassword,
-      authentication: { otp, expDate },
+      authentication: { otp: 1111, expDate },
     };
 
     // Create user
@@ -83,11 +91,17 @@ const createUser = async (
     //   `Your code is: ${otp}`
     // );
 
-    await emailQueue.add("send-verification-email", {
-      email: data.email,
+    await publishJob("emailQueue", {
+      to: data.email,
       subject: "Email Verification Code",
-      text: `Your code is: ${otp}`,
+      body: otp.toString(),
     });
+
+    // await emailQueue.add("send-verification-email", {
+    //   email: data.email,
+    //   subject: "Email Verification Code",
+    //   text: `Your code is: ${otp}`,
+    // });
 
     // Commit the transaction
     await session.commitTransaction();
