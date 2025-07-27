@@ -7,7 +7,7 @@ export interface IBaseUser {
   password: string;
   authentication: {
     expDate: Date;
-    otp: number;
+    otp: string;
     token: string;
   };
   isVerified: boolean;

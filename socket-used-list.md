@@ -5,7 +5,7 @@ io.emit("new-service", { serviceId: service._id });
 
 
 //when new bid created
-io.emit("new-bid", { serviceId: saveBid._id }); 
+  io.emit(`service-${saveBid.reqServiceId}`, { serviceId: saveBid.reqServiceId });
 
 
 // when save payment

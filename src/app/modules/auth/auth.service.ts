@@ -19,6 +19,7 @@ import { TUserRole } from "../../interface/auth.interface";
 
 import { UserProfile } from "../users/userProfile/userProfile.model";
 import { publishJob } from "../../rabbitMq/publisher";
+import logger from "../../utils/logger";
 
 const createUser = async (
   data: {
@@ -218,7 +219,7 @@ const userLogin = async (loginData: {
 
 const verifyUser = async (
   email: string,
-  otp: number
+  otp: string
 ): Promise<{
   userId: string | undefined;
   email: string | undefined;
@@ -228,6 +229,8 @@ const verifyUser = async (
   decodedData: object;
   refreshToken: string;
 }> => {
+  logger.info("hit--2--");
+
   if (!otp) {
     throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
   }
@@ -247,49 +250,30 @@ const verifyUser = async (
   if (otp !== user.authentication.otp) {
     throw new AppError(status.BAD_REQUEST, "Code not matched.");
   }
+
   let refreshToken = "";
-  let updatedUser;
+
   let token = null;
-  if (user.isVerified) {
-    token = jsonWebToken.generateToken(
-      { userEmail: user.email, userId: user._id, userRole: user.role },
-      appConfig.jwt.jwt_access_secret as string,
-      "10m"
-    );
 
-    const expDate = getExpiryTime(10);
-
-    updatedUser = await User.findOneAndUpdate(
-      { email: user.email },
-      {
-        "authentication.otp": null,
-        "authentication.expDate": expDate,
-        needToResetPass: true,
-        "authentication.token": token,
-      },
-      { new: true }
-    );
-  } else {
-    token = jsonWebToken.generateToken(
-      { userEmail: user.email, userId: user._id, userRole: user.role },
-      appConfig.jwt.jwt_access_secret as string,
-      appConfig.jwt.jwt_access_exprire
-    );
-    refreshToken = jsonWebToken.generateToken(
-      { userEmail: user.email, userId: user._id, userRole: user.role },
-      appConfig.jwt.jwt_refresh_secret as string,
-      appConfig.jwt.jwt_refresh_exprire
-    );
-    updatedUser = await User.findOneAndUpdate(
-      { email: user.email },
-      {
-        "authentication.otp": null,
-        "authentication.expDate": null,
-        isVerified: true,
-      },
-      { new: true }
-    );
-  }
+  token = jsonWebToken.generateToken(
+    { userEmail: user.email, userId: user._id, userRole: user.role },
+    appConfig.jwt.jwt_access_secret as string,
+    appConfig.jwt.jwt_access_exprire
+  );
+  refreshToken = jsonWebToken.generateToken(
+    { userEmail: user.email, userId: user._id, userRole: user.role },
+    appConfig.jwt.jwt_refresh_secret as string,
+    appConfig.jwt.jwt_refresh_exprire
+  );
+  const updatedUser = await User.findOneAndUpdate(
+    { email: user.email },
+    {
+      "authentication.otp": null,
+      "authentication.expDate": null,
+      isVerified: true,
+    },
+    { new: true }
+  );
 
   const decodedData = jwtDecode(token);
 
@@ -320,17 +304,17 @@ const forgotPasswordRequest = async (
   const expDate = getExpiryTime(10);
 
   const data = {
-    otp: otp,
+    otp: "1111",
     expDate: expDate,
     needToResetPass: false,
     token: null,
   };
 
-  await sendEmail(
-    user.email,
-    "Reset Password Verification Code",
-    `Your code is: ${otp}`
-  );
+  await publishJob("emailQueue", {
+    to: user.email,
+    subject: "Reset Password Verification Code",
+    body: otp.toString(),
+  });
 
   await User.findOneAndUpdate(
     { email },
@@ -339,6 +323,80 @@ const forgotPasswordRequest = async (
   );
 
   return { email: user.email };
+};
+
+const verifyUserResetPass = async (
+  email: string,
+  otp: string
+): Promise<{
+  userId: string | undefined;
+  email: string | undefined;
+  isVerified: boolean | undefined;
+  needToResetPass: boolean | undefined;
+  accessToken: string | null;
+  decodedData: object;
+  refreshToken: string;
+}> => {
+  logger.info("hit----");
+  if (!otp) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Provide the otp. Check your email."
+    );
+  }
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new AppError(status.BAD_REQUEST, "User not found");
+  }
+
+  const currentDate = new Date();
+  const expirationDate = new Date(user.authentication.expDate);
+
+  if (currentDate > expirationDate) {
+    throw new AppError(status.BAD_REQUEST, "Code time expired.");
+  }
+
+  if (otp !== user.authentication.otp) {
+    throw new AppError(status.BAD_REQUEST, "Code not matched.");
+  }
+
+  let token = null;
+
+  token = jsonWebToken.generateToken(
+    { userEmail: user.email, userId: user._id, userRole: user.role },
+    appConfig.jwt.jwt_access_secret as string,
+    "10m"
+  );
+
+  const expDate = getExpiryTime(10);
+
+  const updatedUser = await User.findOneAndUpdate(
+    { email: user.email },
+    {
+      "authentication.otp": null,
+      "authentication.expDate": expDate,
+      needToResetPass: true,
+      "authentication.token": token,
+    },
+    { new: true }
+  );
+
+  const decodedData = jwtDecode(token);
+
+  return {
+    userId: updatedUser?._id as string,
+    email: updatedUser?.email,
+    isVerified: updatedUser?.isVerified,
+    needToResetPass: updatedUser?.needToResetPass,
+    accessToken: token,
+    refreshToken: "",
+    decodedData: {
+      ...decodedData,
+      iat: (decodedData.iat ?? 0) * 1000,
+      exp: (decodedData.exp ?? 0) * 1000,
+    },
+  };
 };
 
 const resetPassword = async (
@@ -491,6 +549,29 @@ const updatePassword = async (
 const reSendOtp = async (userEmail: string) => {
   const OTP = getOtp(4);
 
+  const userData = await User.findOne({ email: userEmail });
+
+  if (!userData?.authentication.otp) {
+    throw new AppError(
+      500,
+      "hmm....why do u click resend code? you don't have code"
+    );
+  }
+
+  const currentDate = new Date();
+  const expirationDate = new Date(userData.authentication.expDate);
+
+  if (currentDate < expirationDate) {
+    throw new AppError(status.BAD_REQUEST, "Use previous code.");
+  }
+
+  if (!userData?.authentication.otp) {
+    throw new AppError(
+      500,
+      "hmm....why do u click resend code? you don't have code"
+    );
+  }
+
   const updateUser = await User.findOneAndUpdate(
     { email: userEmail },
     {
@@ -514,6 +595,7 @@ export const AuthService = {
   userLogin,
   verifyUser,
   forgotPasswordRequest,
+  verifyUserResetPass,
   resetPassword,
   getNewAccessToken,
   updatePassword,

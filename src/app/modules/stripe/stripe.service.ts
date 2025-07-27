@@ -185,58 +185,44 @@ const createPaymentIntent = async (data: {
   userId: string;
 }) => {
   const user = await User.findById(data.userId);
-
   if (!user) throw new Error("User not found");
 
   let stripeCustomerId = user.stripeCustomerId;
 
-  // 2. Create Stripe Customer if not exists
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
       email: user.email,
-      metadata: {
-        userId: String(user._id),
-      },
+      metadata: { userId: String(user._id) },
     });
 
     stripeCustomerId = customer.id;
-
-    // 3. Save Stripe customer ID to your user record
     user.stripeCustomerId = stripeCustomerId;
     await user.save();
   }
 
-  // 4. Create Checkout Session linked to the Stripe customer
-  const convertedAmount = Math.round(data.bidPrice * 100);
+  const ephemeralKey = await stripe.ephemeralKeys.create(
+    { customer: stripeCustomerId },
+    { apiVersion: "2024-08-01" } // use your current Stripe API version
+  );
 
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ["card"],
-    mode: "payment",
-    customer: stripeCustomerId, // associate session with existing customer
-    line_items: [
-      {
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: data.isForExtraWork ? "Extra Work Payment" : "Bid Payment",
-          },
-          unit_amount: convertedAmount,
-        },
-        quantity: 1,
-      },
-    ],
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(data.bidPrice * 100), // convert to cents
+    currency: "usd",
+    customer: stripeCustomerId,
+    automatic_payment_methods: { enabled: true },
     metadata: {
       bidId: data.bidId.toString(),
-      isForExtraWork: data.isForExtraWork ? "yes" : "no",
       serviceId: data.serviceId.toString(),
       userId: data.userId,
+      isForExtraWork: data.isForExtraWork ? "yes" : "no",
     },
-    success_url:
-      "https://yourdomain.com/payment-success?session_id={CHECKOUT_SESSION_ID}",
-    cancel_url: "https://yourdomain.com/payment-cancelled",
   });
 
-  return { sessionId: session.id, url: session.url };
+  return {
+    paymentIntent: paymentIntent.client_secret,
+    ephemeralKey: ephemeralKey.secret,
+    customer: stripeCustomerId,
+  };
 };
 
 const stripeWebhook = async (rawBody: Buffer, sig: string) => {
@@ -254,46 +240,17 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
   }
   logger.info(event.type);
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "payment_intent.succeeded": {
       console.log("Hit");
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
-      const session = event.data.object as Stripe.Checkout.Session;
+      // Access your metadata here
+      const metadata = paymentIntent.metadata;
 
-      // Access metadata
-      const bidId = session.metadata?.bidId;
-      const isForExtraWork = session.metadata?.isForExtraWork;
-      const serviceId = session.metadata?.serviceId;
-
-      console.log(bidId, isForExtraWork, serviceId);
-
-      //      if (paymentIntent) {
-      //   const datas = await Payment.findOne({
-      //     ...data,
-      //   });
-
-      //   if (!datas) {
-      //     await Payment.create({
-      //       bidId: data.bidId,
-      //       status: PaymentStatus.UNPAID,
-      //       serviceId: bidData.reqServiceId,
-      //     });
-      //   }
-
-      //   if (
-      //     datas &&
-      //     (datas.status === PaymentStatus.HOLD ||
-      //       datas.status === PaymentStatus.REFUNDED ||
-      //       datas.status === PaymentStatus.PAID ||
-      //       datas.status === PaymentStatus.CANCELLED)
-      //   ) {
-      //     throw new AppError(
-      //       status.BAD_REQUEST,
-      //       `Payment for this bid status is: ${datas.status}`
-      //     );
-      //   }
-      // } else {
-      //   throw new AppError(status.BAD_REQUEST, "Failed to create client secret.");
-      // }
+      console.log("✅ Payment succeeded for Bid ID:", metadata.bidId);
+      console.log("User ID:", metadata.userId);
+      console.log("Service ID:", metadata.serviceId);
+      console.log("Extra Work:", metadata.isForExtraWork);
     }
   }
 };
@@ -306,3 +263,57 @@ export const StripeService = {
   saveExtraWorkPayment,
   stripeWebhook,
 };
+
+// const user = await User.findById(data.userId);
+
+// if (!user) throw new Error("User not found");
+
+// let stripeCustomerId = user.stripeCustomerId;
+
+// // 2. Create Stripe Customer if not exists
+// if (!stripeCustomerId) {
+//   const customer = await stripe.customers.create({
+//     email: user.email,
+//     metadata: {
+//       userId: String(user._id),
+//     },
+//   });
+
+//   stripeCustomerId = customer.id;
+
+//   // 3. Save Stripe customer ID to your user record
+//   user.stripeCustomerId = stripeCustomerId;
+//   await user.save();
+// }
+
+// // 4. Create Checkout Session linked to the Stripe customer
+// const convertedAmount = Math.round(data.bidPrice * 100);
+
+// const session = await stripe.checkout.sessions.create({
+//   payment_method_types: ["card"],
+//   mode: "payment",
+//   customer: stripeCustomerId, // associate session with existing customer
+//   line_items: [
+//     {
+//       price_data: {
+//         currency: "usd",
+//         product_data: {
+//           name: data.isForExtraWork ? "Extra Work Payment" : "Bid Payment",
+//         },
+//         unit_amount: convertedAmount,
+//       },
+//       quantity: 1,
+//     },
+//   ],
+//   metadata: {
+//     bidId: data.bidId.toString(),
+//     isForExtraWork: data.isForExtraWork ? "yes" : "no",
+//     serviceId: data.serviceId.toString(),
+//     userId: data.userId,
+//   },
+//   success_url:
+//     "https://yourdomain.com/payment-success?session_id={CHECKOUT_SESSION_ID}",
+//   cancel_url: "https://yourdomain.com/payment-cancelled",
+// });
+
+// return { sessionId: session.id, url: session.url };

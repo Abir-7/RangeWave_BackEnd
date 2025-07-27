@@ -66,7 +66,9 @@ const addBid = async (
 
   const io = getSocket();
 
-  io.emit("new-bid", { serviceId: saveBid._id });
+  io.emit(`service-${saveBid.reqServiceId}`, {
+    serviceId: saveBid.reqServiceId,
+  });
 
   return saveBid;
 };

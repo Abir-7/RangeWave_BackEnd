@@ -31,11 +31,13 @@ export const auth =
       logger.info("token given");
       console.log(token);
       const decodedData = jsonWebToken.verifyJwt(
-        token,
+        token.trim(),
         appConfig.jwt.jwt_access_secret as string
       );
-      logger.info(`token decoded. ${decodedData.userId}`);
-      const userData = await User.findById(decodedData.userId);
+
+      console.log(decodedData);
+      logger.info(`token decoded.${decodedData.userId}`);
+      const userData = await User.findById({ _id: decodedData.userId });
 
       if (!userData) {
         return next(
