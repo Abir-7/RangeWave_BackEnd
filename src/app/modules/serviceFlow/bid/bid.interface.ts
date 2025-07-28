@@ -5,7 +5,7 @@ export interface IBid {
   reqServiceId: Types.ObjectId;
   mechanicId: Types.ObjectId;
   status: BidStatus;
-
+  extraWork: Types.ObjectId;
   location: {
     placeId: string;
     coordinates: {

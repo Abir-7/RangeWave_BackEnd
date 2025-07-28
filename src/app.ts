@@ -10,20 +10,21 @@ import { StripeController } from "./app/modules/stripe/stripe.controller";
 const app = express();
 
 const corsOption = {
-  origin: ["*", "https://"],
+  origin: ["*", "http://10.10.12.62:3000"],
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
 };
 
 app.use(cors(corsOption));
 app.use(cookieParser());
-app.use(express.json());
 
 app.use(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
   StripeController.stripeWebhook
 );
+
+app.use(express.json());
 
 app.use(express.urlencoded({ extended: true }));
 

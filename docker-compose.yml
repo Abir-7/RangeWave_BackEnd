@@ -6,8 +6,8 @@ services:
     image: rabbitmq:3-management
     container_name: range-wave-rabbitmq
     ports:
-      - "5675:5672"
-      - "15675:15672"
+      - "5676:5672"
+      - "15676:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}

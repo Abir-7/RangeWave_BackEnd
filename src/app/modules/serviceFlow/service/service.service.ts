@@ -81,6 +81,7 @@ const addServiceReq = async (
   // }
 
   // If no conflict, create the new service
+
   const service = await Service.create({
     issue: serviceData.issue,
     description: serviceData.description,
@@ -281,13 +282,16 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
 
   const paymentIntentData = {
     bidId: bidData._id,
-    isForExtraWork: false,
     bidPrice: bidData.price,
     serviceId: bidData.reqServiceId,
     userId,
+    mechanicId: String(bidData.mechanicId),
   };
 
-  const result = await StripeService.createPaymentIntent(paymentIntentData);
+  const result = await StripeService.createPaymentIntent({
+    ...paymentIntentData,
+    isForExtraWork: false,
+  });
 
   // need to validate before payment done...if payment already done or not
 

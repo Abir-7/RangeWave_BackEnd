@@ -7,6 +7,7 @@ const BidSchema = new Schema<IBid>(
       type: Number,
       required: true,
     },
+    extraWork: { type: Schema.Types.ObjectId, ref: "ExtraWork" },
     location: {
       placeId: {
         type: String,

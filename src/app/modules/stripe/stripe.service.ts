@@ -182,11 +182,13 @@ const createPaymentIntent = async (data: {
   isForExtraWork: boolean;
   bidPrice: number;
   serviceId: string | Types.ObjectId;
+  mechanicId: string;
   userId: string;
 }) => {
   const user = await User.findById(data.userId);
   if (!user) throw new Error("User not found");
 
+  // Get or create Stripe customer
   let stripeCustomerId = user.stripeCustomerId;
 
   if (!stripeCustomerId) {
@@ -200,11 +202,53 @@ const createPaymentIntent = async (data: {
     await user.save();
   }
 
-  const ephemeralKey = await stripe.ephemeralKeys.create(
-    { customer: stripeCustomerId },
-    { apiVersion: "2024-08-01" } // use your current Stripe API version
-  );
+  // Check if a payment already exists
+  const existingPayment = await Payment.findOne({
+    bidId: data.bidId,
+    serviceId: data.serviceId,
+    user: data.userId,
+  });
 
+  if (
+    existingPayment &&
+    [
+      PaymentStatus.HOLD,
+      PaymentStatus.REFUNDED,
+      PaymentStatus.PAID,
+      PaymentStatus.CANCELLED,
+    ].includes(existingPayment.status)
+  ) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Payment for this bid status is: ${existingPayment.status}`
+    );
+  }
+
+  // Try to reuse previous unpaid PaymentIntent
+  if (existingPayment && existingPayment.status === PaymentStatus.UNPAID) {
+    const stripeIntent = await stripe.paymentIntents.retrieve(
+      existingPayment.txId
+    );
+
+    if (
+      [
+        "requires_payment_method",
+        "requires_confirmation",
+        "requires_action",
+        "processing",
+      ].includes(stripeIntent.status)
+    ) {
+      return {
+        paymentIntent: stripeIntent.client_secret,
+        customer: stripeCustomerId,
+      };
+    }
+
+    // Delete outdated Payment record
+    await Payment.findOneAndDelete({ _id: existingPayment._id });
+  }
+
+  // Create new Stripe PaymentIntent
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(data.bidPrice * 100), // convert to cents
     currency: "usd",
@@ -215,12 +259,21 @@ const createPaymentIntent = async (data: {
       serviceId: data.serviceId.toString(),
       userId: data.userId,
       isForExtraWork: data.isForExtraWork ? "yes" : "no",
+      mechanicId: data.mechanicId,
     },
+  });
+
+  // Save in DB
+  await Payment.create({
+    bidId: data.bidId,
+    serviceId: data.serviceId,
+    user: data.userId,
+    txId: paymentIntent.id,
+    status: PaymentStatus.UNPAID,
   });
 
   return {
     paymentIntent: paymentIntent.client_secret,
-    ephemeralKey: ephemeralKey.secret,
     customer: stripeCustomerId,
   };
 };
@@ -239,19 +292,39 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
     throw new Error("Webhook signature verification failed.");
   }
   logger.info(event.type);
+
   switch (event.type) {
     case "payment_intent.succeeded": {
-      console.log("Hit");
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
-      // Access your metadata here
+      await handleSuccessfulPaymentIntent(paymentIntent);
+
+      break;
+    }
+
+    case "payment_intent.payment_failed":
+    case "payment_intent.canceled": {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const metadata = paymentIntent.metadata;
 
-      console.log("✅ Payment succeeded for Bid ID:", metadata.bidId);
-      console.log("User ID:", metadata.userId);
-      console.log("Service ID:", metadata.serviceId);
-      console.log("Extra Work:", metadata.isForExtraWork);
+      logger.warn(`❌ Payment ${event.type} for Bid ID: ${metadata.bidId}`);
+
+      await Payment.findOneAndUpdate(
+        {
+          bidId: metadata.bidId,
+          serviceId: metadata.serviceId,
+          txId: paymentIntent.id,
+        },
+        {
+          status: PaymentStatus.CANCELLED,
+        }
+      );
+
+      break;
     }
+
+    default:
+      logger.info(`ℹ️ Unhandled event type: ${event.type}`);
   }
 };
 
@@ -264,56 +337,53 @@ export const StripeService = {
   stripeWebhook,
 };
 
-// const user = await User.findById(data.userId);
+const handleSuccessfulPaymentIntent = async (
+  paymentIntent: Stripe.PaymentIntent
+) => {
+  const metadata = paymentIntent.metadata;
 
-// if (!user) throw new Error("User not found");
+  logger.info("✅ Payment succeeded for Bid ID:", metadata.bidId);
 
-// let stripeCustomerId = user.stripeCustomerId;
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-// // 2. Create Stripe Customer if not exists
-// if (!stripeCustomerId) {
-//   const customer = await stripe.customers.create({
-//     email: user.email,
-//     metadata: {
-//       userId: String(user._id),
-//     },
-//   });
+  try {
+    const updatedPayment = await Payment.findOneAndUpdate(
+      {
+        bidId: metadata.bidId,
+        serviceId: metadata.serviceId,
+        txId: paymentIntent.id,
+        user: metadata.userId,
+      },
+      {
+        status: PaymentStatus.PAID,
+        txId: paymentIntent.id,
+      },
+      { session, new: true }
+    );
 
-//   stripeCustomerId = customer.id;
+    await Service.findOneAndUpdate(
+      { _id: metadata.serviceId },
+      { status: Status.WAITING },
+      { session }
+    );
 
-//   // 3. Save Stripe customer ID to your user record
-//   user.stripeCustomerId = stripeCustomerId;
-//   await user.save();
-// }
+    await createRoomAfterHire(
+      [metadata.userId as string, metadata.mechanicId as string],
+      session
+    );
 
-// // 4. Create Checkout Session linked to the Stripe customer
-// const convertedAmount = Math.round(data.bidPrice * 100);
+    await session.commitTransaction();
+    session.endSession();
 
-// const session = await stripe.checkout.sessions.create({
-//   payment_method_types: ["card"],
-//   mode: "payment",
-//   customer: stripeCustomerId, // associate session with existing customer
-//   line_items: [
-//     {
-//       price_data: {
-//         currency: "usd",
-//         product_data: {
-//           name: data.isForExtraWork ? "Extra Work Payment" : "Bid Payment",
-//         },
-//         unit_amount: convertedAmount,
-//       },
-//       quantity: 1,
-//     },
-//   ],
-//   metadata: {
-//     bidId: data.bidId.toString(),
-//     isForExtraWork: data.isForExtraWork ? "yes" : "no",
-//     serviceId: data.serviceId.toString(),
-//     userId: data.userId,
-//   },
-//   success_url:
-//     "https://yourdomain.com/payment-success?session_id={CHECKOUT_SESSION_ID}",
-//   cancel_url: "https://yourdomain.com/payment-cancelled",
-// });
-
-// return { sessionId: session.id, url: session.url };
+    if (updatedPayment) {
+      const io = getSocket();
+      io.emit("new-hire", { paymentId: updatedPayment._id });
+    }
+  } catch (error) {
+    logger.error("❌ Transaction failed for payment success:", error);
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};

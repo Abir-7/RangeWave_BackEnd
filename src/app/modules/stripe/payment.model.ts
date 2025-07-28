@@ -9,13 +9,12 @@ const paymentSchema: Schema<IPayment> = new Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Bid",
       required: true,
-      unique: true,
     },
+    user: { type: Schema.Types.ObjectId, required: true, ref: "User" },
     serviceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Service",
       required: true,
-      unique: true,
     },
     status: {
       type: String,

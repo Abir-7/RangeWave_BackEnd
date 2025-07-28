@@ -11,6 +11,7 @@ export interface IPayment {
     status: PaymentStatus;
   }; //! todo make function for extrapay
   transferId: string;
+  user: Types.ObjectId;
 }
 
 export enum PaymentStatus {
