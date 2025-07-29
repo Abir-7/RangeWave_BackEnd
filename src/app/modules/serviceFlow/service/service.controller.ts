@@ -107,7 +107,9 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
 
 const getAllRequestedService = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await ServiceService.getAllRequestedService();
+    const result = await ServiceService.getAllRequestedService(
+      req.body.coordinate
+    );
     sendResponse(res, {
       success: true,
       statusCode: 200,
@@ -131,7 +133,7 @@ const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
 const changeServiceStatus = catchAsync(async (req: Request, res: Response) => {
   const { pId } = req.params;
 
-  const result = await ServiceService.changeServiceStatus(pId);
+  const result = await ServiceService.changeServiceStatus(pId, req.body.status);
   sendResponse(res, {
     success: true,
     statusCode: 200,

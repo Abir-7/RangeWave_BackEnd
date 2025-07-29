@@ -18,7 +18,6 @@ const userSchema = new Schema<IUser>({
   isVerified: { type: Boolean, default: false },
   needToResetPass: { type: Boolean, default: false },
   needToUpdateProfile: { type: Boolean, default: true },
-  stripeCustomerId: { type: String },
 });
 
 userSchema.methods.comparePassword = async function (enteredPassword: string) {

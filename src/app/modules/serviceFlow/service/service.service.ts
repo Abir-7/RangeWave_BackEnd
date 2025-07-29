@@ -4,7 +4,7 @@ import { status } from "http-status";
 import mongoose, { model, PipelineStage } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Service } from "./service.model";
-import { IService, Status } from "./service.interface";
+import { IService, IsServiceCompleted, Status } from "./service.interface";
 import Bid from "../bid/bid.model";
 
 import { StripeService } from "../../stripe/stripe.service";
@@ -280,12 +280,25 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
     throw new AppError(status.NOT_FOUND, "Service not found.");
   }
 
+  const userMechanic = await MechanicProfile.findOne({
+    user: bidData.mechanicId,
+  });
+
+  if (!userMechanic) {
+    throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
+  }
+
+  if (!userMechanic.stripeAccountId) {
+    throw new AppError(status.NOT_FOUND, "Account id not found.");
+  }
+
   const paymentIntentData = {
     bidId: bidData._id,
     bidPrice: bidData.price,
     serviceId: bidData.reqServiceId,
     userId,
     mechanicId: String(bidData.mechanicId),
+    accountId: decrypt(userMechanic?.stripeAccountId),
   };
 
   const result = await StripeService.createPaymentIntent({
@@ -309,6 +322,7 @@ const markServiceAsComplete = async (pId: string) => {
   try {
     // 1. Get initial payment
     const paymentData = await Payment.findById(pId).session(session);
+
     if (!paymentData)
       throw new AppError(status.NOT_FOUND, "Payment data not found.");
 
@@ -317,86 +331,31 @@ const markServiceAsComplete = async (pId: string) => {
       _id: paymentData.serviceId,
       status: Status.COMPLETED,
     }).session(session);
-    if (!serviceData)
-      throw new AppError(status.NOT_FOUND, "Service data not found.");
 
-    if (serviceData.isStatusAccepted) {
+    if (!serviceData) {
+      throw new AppError(status.NOT_FOUND, "Service data not found.");
+    }
+
+    if (serviceData.isServiceCompleted === IsServiceCompleted.YES) {
       throw new AppError(
         status.BAD_REQUEST,
         "Service already marked as completed."
       );
     }
 
-    serviceData.isStatusAccepted = true;
-    await serviceData.save({ session });
-
-    // 3. Get bid data
-    const bidData = await Bid.findOne({
-      reqServiceId: serviceData._id,
-    }).session(session);
-    if (!bidData) throw new AppError(status.NOT_FOUND, "Bid data not found");
-
-    // 4. Get full payment record
-    const paymentRecord = await Payment.findOne({
-      bidId: bidData._id,
-    }).session(session);
-    if (!paymentRecord?.txId) {
-      throw new AppError(status.BAD_REQUEST, "Payment or txId not found");
-    }
-
-    // 5. Get mechanic profile & Stripe ID
-    const mechanicProfile = await MechanicProfile.findById(
-      bidData.mechanicId
-    ).session(session);
-    if (!mechanicProfile?.stripeAccountId) {
-      throw new AppError(status.BAD_REQUEST, "Mechanic Stripe ID missing");
-    }
-    const stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
+    serviceData.isServiceCompleted = IsServiceCompleted.YES;
 
     // 6. Get main payment intent
-    const mainIntent = await stripe.paymentIntents.retrieve(paymentRecord.txId);
-    if (mainIntent.status !== "succeeded") {
-      throw new AppError(status.BAD_REQUEST, "Main payment not successful");
-    }
-
-    let extraAmount = 0;
-
-    // 7. Optional: Get extra work payment intent
-    if (
-      paymentRecord.extraPay?.status === PaymentStatus.HOLD &&
-      paymentRecord.extraPay?.txId
-    ) {
-      const extraIntent = await stripe.paymentIntents.retrieve(
-        paymentRecord.extraPay.txId
-      );
-      if (extraIntent?.status === "succeeded") {
-        extraAmount = extraIntent.amount_received;
-      }
-    }
-
-    // 8. Calculate 90% from total (main + extra)
-    const totalReceived = mainIntent.amount_received + extraAmount;
-    const amountToTransfer = Math.floor(totalReceived * 0.9); // 10% fee once
-
-    // 9. Transfer to mechanic
-    const transfer = await stripe.transfers.create({
-      amount: amountToTransfer,
-      currency: mainIntent.currency,
-      destination: stripeAccountId,
-      description: `Payout for bid ${bidData._id}`,
-    });
-
-    if (!transfer?.id) {
-      throw new AppError(status.BAD_REQUEST, "Failed to transfer payment");
-    }
-
-    // 10. Update payment status
-    paymentRecord.status = PaymentStatus.PAID;
-    paymentRecord.transferId = transfer.id;
-    await paymentRecord.save({ session });
+    const res = await stripe.paymentIntents.capture(paymentData.txId);
+    console.log(res);
+    await serviceData.save({ session });
 
     // 11. Emit socket event
-    getSocket().emit("markAsComplete", { bidId: bidData._id });
+    getSocket().emit("markAsComplete", {
+      bidId: paymentData.bidId,
+      serviceId: paymentData.serviceId,
+      paymentId: paymentData._id,
+    });
 
     await session.commitTransaction();
     session.endSession();
@@ -542,6 +501,7 @@ const getRunningService = async (userId: string) => {
             price: "$paymentData.price",
           },
           profile: "$paymentData.mechanic",
+          paymentId: "$paymentData._id",
         },
       },
     ]);
@@ -642,6 +602,7 @@ const getRunningService = async (userId: string) => {
             price: "$paymentData.bidData.price",
           },
           profile: 1,
+          paymentId: "$paymentData._id",
         },
       },
     ]);
@@ -740,7 +701,7 @@ const seeCurrentServiceProgress = async (pId: string) => {
 
 //! ----------------------------for mechanics-------------------------------//
 
-const getAllRequestedService = async () => {
+const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
   const aggregateArray: PipelineStage[] = [
     {
       $match: {
@@ -754,14 +715,43 @@ const getAllRequestedService = async () => {
         pipeline: [
           {
             $match: {
-              $expr: {
-                $eq: ["$reqServiceId", "$$serviceId"],
-              },
-              status: { $ne: BidStatus.declined },
+              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
             },
           },
         ],
-        as: "bid",
+        as: "bids",
+      },
+    },
+    {
+      // Remove services where ALL bids are declined
+      $match: {
+        $expr: {
+          $or: [
+            { $eq: [{ $size: "$bids" }, 0] }, // keep if no bids
+            {
+              $gt: [
+                {
+                  $size: {
+                    $filter: {
+                      input: "$bids",
+                      as: "b",
+                      cond: { $ne: ["$$b.status", BidStatus.declined] },
+                    },
+                  },
+                },
+                0,
+              ],
+            }, // keep if there's at least one non-declined bid
+          ],
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "userprofiles",
+        localField: "user",
+        foreignField: "user",
+        as: "profileData",
       },
     },
     {
@@ -771,7 +761,7 @@ const getAllRequestedService = async () => {
             {
               $size: {
                 $filter: {
-                  input: "$bid",
+                  input: "$bids",
                   as: "b",
                   cond: { $eq: ["$$b.status", BidStatus.provided] },
                 },
@@ -788,16 +778,30 @@ const getAllRequestedService = async () => {
     },
     {
       $project: {
-        bid: 0, // remove the full bid array if not needed
+        "profileData.carInfo": 0,
+        "profileData.location": 0,
+        bids: 0,
       },
     },
   ];
 
   const data = await Service.aggregate(aggregateArray);
-  return data;
+
+  const enriched = data.map((service: any) => {
+    const distance = calculateDistance(
+      mechanicCoordinate,
+      service.location.coordinates
+    );
+    return {
+      ...service,
+      distanceKm: distance,
+    };
+  });
+
+  return enriched;
 };
 
-const changeServiceStatus = async (pId: string) => {
+const changeServiceStatus = async (pId: string, statusData: Status) => {
   const paymentData = await Payment.findById(pId);
 
   if (!paymentData) {
@@ -816,13 +820,19 @@ const changeServiceStatus = async (pId: string) => {
     throw new AppError(status.NOT_FOUND, "Service data not found.");
   }
 
-  if (serviceData?.status === Status.WAITING) {
+  if (serviceData?.status === Status.WAITING && statusData === Status.WORKING) {
     serviceData.status = Status.WORKING;
-  } else if (serviceData.status === Status.WORKING) {
+  } else if (
+    serviceData.status === Status.WORKING &&
+    statusData === Status.COMPLETED
+  ) {
     serviceData.status = Status.COMPLETED;
-    serviceData.isStatusAccepted = false;
+    serviceData.isServiceCompleted = IsServiceCompleted.WAITING;
   } else {
-    throw new AppError(status.BAD_REQUEST, "Faild to change service status");
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Faild to change service status. Current status:${serviceData.status}`
+    );
   }
 
   const newData = await serviceData.save();

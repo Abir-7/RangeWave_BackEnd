@@ -9,7 +9,6 @@ router.post(
   StripeController.createAndConnect
 );
 
-router.post("/save-payment", auth("USER"), StripeController.savePaymentData);
 router.post(
   "/save-extra-work-payment",
   auth("USER"),

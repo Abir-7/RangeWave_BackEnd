@@ -24,7 +24,7 @@ const addBid = async (
 
   const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
 
-  if (!mechaniceProfile || mechaniceProfile.stripeAccountId) {
+  if (!mechaniceProfile || !mechaniceProfile.stripeAccountId) {
     throw new AppError(
       status.NOT_FOUND,
       "Profile or stripe account id not found."

@@ -28,4 +28,5 @@ export interface IUserProfile {
   image?: string;
   user: Types.ObjectId;
   carInfo: ICarInfo;
+  stripeCustomerId: string;
 }

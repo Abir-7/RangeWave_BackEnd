@@ -1,5 +1,10 @@
 import mongoose, { Schema } from "mongoose";
-import { CancelReason, IService, Status } from "./service.interface";
+import {
+  CancelReason,
+  IService,
+  IsServiceCompleted,
+  Status,
+} from "./service.interface";
 
 const serviceSchema = new Schema<IService>(
   {
@@ -16,9 +21,10 @@ const serviceSchema = new Schema<IService>(
       enum: [...Object.values(Status)],
       default: Status.FINDING,
     },
-    isStatusAccepted: {
-      type: Boolean,
-      default: null,
+    isServiceCompleted: {
+      type: String,
+      enum: [...Object.values(IsServiceCompleted)],
+      default: IsServiceCompleted.NO,
     },
     cancelReson: {
       type: String,

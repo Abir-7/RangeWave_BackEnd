@@ -169,9 +169,11 @@ const acceptReqForExtrawork = async (pId: string) => {
     userId: String(service.user),
   };
 
-  const paymentIntent = await StripeService.createPaymentIntent(
-    paymentIntentData
-  );
+  const paymentIntent = await StripeService.createPaymentIntent({
+    ...paymentIntentData,
+    mechanicId: "",
+    accountId: "",
+  });
 
   paymentData.extraPay.status = PaymentStatus.UNPAID;
   paymentData.extraPay.extraWorkId = extraWork._id;

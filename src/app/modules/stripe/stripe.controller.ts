@@ -15,16 +15,6 @@ const createAndConnect = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const savePaymentData = catchAsync(async (req: Request, res: Response) => {
-  const result = await StripeService.savePaymentData(req.body, req.user.userId);
-  sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: "Success",
-    data: result,
-  });
-});
-
 const refundPayment = catchAsync(async (req: Request, res: Response) => {
   const result = await StripeService.refundPayment(req.body.bidId);
   sendResponse(res, {
@@ -64,8 +54,6 @@ const stripeWebhook = catchAsync(async (req, res) => {
 
 export const StripeController = {
   createAndConnect,
-
-  savePaymentData,
   refundPayment,
   saveExtraWorkPayment,
   stripeWebhook,

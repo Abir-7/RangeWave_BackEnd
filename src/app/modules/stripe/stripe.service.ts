@@ -9,7 +9,6 @@ import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model"
 import { stripe } from "./stripe";
 import { decrypt, encrypt } from "../../utils/helper/encrypt&decrypt";
 import { appConfig } from "../../config";
-import Bid from "../serviceFlow/bid/bid.model";
 
 import { Status } from "../serviceFlow/service/service.interface";
 import Payment from "./payment.model";
@@ -20,6 +19,7 @@ import { getSocket } from "../../socket/socket";
 import logger from "../../utils/logger";
 import Stripe from "stripe";
 import User from "../users/user/user.model";
+import { UserProfile } from "../users/userProfile/userProfile.model";
 
 const createAndConnect = async (mechanicEmail: string) => {
   const account = await stripe.accounts.create({
@@ -49,93 +49,6 @@ const createAndConnect = async (mechanicEmail: string) => {
     type: "account_onboarding",
   });
   return { url: accountLink.url, accountId: account.id };
-};
-
-const savePaymentData = async (
-  data: { txId: string; bidId: string; serviceId: string },
-  userId: string
-) => {
-  const { txId, bidId, serviceId } = data;
-
-  if (!txId || !bidId) {
-    throw new AppError(status.NOT_FOUND, `provide ${!txId ? "txId" : "bidId"}`);
-  }
-
-  // Start a session
-  const session = await mongoose.startSession();
-
-  try {
-    session.startTransaction();
-
-    // Fetch Bid with populated fields (inside transaction session)
-    const bidData = (await Bid.findOne({ bidId, reqServiceId: serviceId })
-      .populate({
-        path: "reqServiceId",
-      })
-      .populate({
-        path: "mechanicId",
-        model: "MechanicProfile",
-        localField: "mechanicId",
-        foreignField: "user",
-        select: "-location -certificates -experience   -__v",
-      })
-      .session(session)) as any;
-
-    console.log(bidData);
-
-    if (!bidData) {
-      throw new AppError(status.NOT_FOUND, "Bid not found");
-    }
-
-    // Update Service status
-    const serviceData = await Service.findOneAndUpdate(
-      { _id: bidData.reqServiceId._id },
-      { status: Status.WAITING },
-      { new: true, session }
-    );
-
-    // Assuming you modify createRoom to accept session or it internally uses session
-
-    if (!serviceData) {
-      throw new Error("Service not found.");
-    }
-
-    const users = [userId.toString(), bidData.mechanicId.user.toString()] as [
-      string,
-      string
-    ];
-
-    await createRoomAfterHire(users, session);
-
-    const newPaymentData = await Payment.findOneAndUpdate(
-      { bidId, serviceId },
-      { txId, status: PaymentStatus.HOLD },
-      { new: true, session } // <-- pass session here
-    );
-
-    if (!newPaymentData) {
-      throw new AppError(
-        status.NOT_FOUND,
-        "Failed to update payment. Data not found"
-      );
-    }
-
-    const io = getSocket();
-    io.emit("new-hire", { paymentId: newPaymentData._id });
-
-    // Commit transaction
-    await session.commitTransaction();
-    await session.endSession();
-    return await newPaymentData.populate({
-      path: "bidId",
-      populate: "reqServiceId",
-    });
-  } catch (error: any) {
-    console.log(error);
-    await session.abortTransaction();
-    await session.endSession();
-    throw new Error(error);
-  }
 };
 
 const refundPayment = async (txId: string) => {
@@ -182,14 +95,17 @@ const createPaymentIntent = async (data: {
   isForExtraWork: boolean;
   bidPrice: number;
   serviceId: string | Types.ObjectId;
-  mechanicId: string;
   userId: string;
+  mechanicId: string;
+  accountId: string;
 }) => {
   const user = await User.findById(data.userId);
   if (!user) throw new Error("User not found");
 
+  const userProfile = await UserProfile.findOne({ user: user._id });
+  if (!userProfile) throw new Error("User profile not found");
   // Get or create Stripe customer
-  let stripeCustomerId = user.stripeCustomerId;
+  let stripeCustomerId = userProfile.stripeCustomerId;
 
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
@@ -198,7 +114,7 @@ const createPaymentIntent = async (data: {
     });
 
     stripeCustomerId = customer.id;
-    user.stripeCustomerId = stripeCustomerId;
+    userProfile.stripeCustomerId = stripeCustomerId;
     await user.save();
   }
 
@@ -248,12 +164,21 @@ const createPaymentIntent = async (data: {
     await Payment.findOneAndDelete({ _id: existingPayment._id });
   }
 
+  const amount = Math.round(data.bidPrice * 100);
+
+  const fee = Math.round(amount * 0.1); // 10% fee = 1000 cents
+
   // Create new Stripe PaymentIntent
   const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(data.bidPrice * 100), // convert to cents
+    amount: amount, // convert to cents
     currency: "usd",
     customer: stripeCustomerId,
     automatic_payment_methods: { enabled: true },
+    capture_method: "manual", // authorize only
+    application_fee_amount: fee,
+    transfer_data: {
+      destination: data.accountId, // <--- add this!
+    },
     metadata: {
       bidId: data.bidId.toString(),
       serviceId: data.serviceId.toString(),
@@ -274,7 +199,6 @@ const createPaymentIntent = async (data: {
 
   return {
     paymentIntent: paymentIntent.client_secret,
-    customer: stripeCustomerId,
   };
 };
 
@@ -331,7 +255,7 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
 export const StripeService = {
   createAndConnect,
   createPaymentIntent,
-  savePaymentData,
+
   refundPayment,
   saveExtraWorkPayment,
   stripeWebhook,

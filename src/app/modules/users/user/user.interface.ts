@@ -13,7 +13,6 @@ export interface IBaseUser {
   isVerified: boolean;
   needToResetPass: boolean;
   needToUpdateProfile: boolean;
-  stripeCustomerId?: string;
 }
 
 export interface IUser extends IBaseUser, Document {

@@ -31,7 +31,7 @@ const paymentSchema: Schema<IPayment> = new Schema(
       status: {
         type: String,
         enum: Object.values(PaymentStatus),
-        default: PaymentStatus.UNPAID,
+        default: null,
         required: true,
       },
       txId: { type: Schema.Types.ObjectId, default: null },

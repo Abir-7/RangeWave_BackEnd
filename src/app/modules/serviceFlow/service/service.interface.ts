@@ -5,7 +5,7 @@ export interface IService {
   description: string;
   user: Types.ObjectId;
   status: Status;
-  isStatusAccepted: boolean;
+  isServiceCompleted: IsServiceCompleted;
   location: {
     placeId: string;
     coordinates: {
@@ -28,6 +28,13 @@ export enum Status {
   WORKING = "WORKING",
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
+}
+
+export enum IsServiceCompleted {
+  YES = "YES",
+  NO = "NO",
+  WAITING = "WAITING",
+  REJECTED = "REJECTED",
 }
 
 export enum CancelReason {

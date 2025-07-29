@@ -29,7 +29,7 @@ router.patch(
 );
 
 //-----------------------------------------for mechanics-------------------------------
-router.get(
+router.post(
   "/get-requested-service-list",
   auth("MECHANIC"),
   ServiceController.getAllRequestedService
