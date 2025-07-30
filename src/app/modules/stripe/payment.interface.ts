@@ -12,6 +12,7 @@ export interface IPayment {
   }; //! todo make function for extrapay
   transferId: string;
   user: Types.ObjectId;
+  isPaymentTransfered: boolean;
 }
 
 export enum PaymentStatus {

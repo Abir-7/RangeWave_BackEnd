@@ -22,33 +22,55 @@ import User from "../users/user/user.model";
 import { UserProfile } from "../users/userProfile/userProfile.model";
 
 const createAndConnect = async (mechanicEmail: string) => {
-  const account = await stripe.accounts.create({
-    country: "US",
-    type: "express",
-    email: mechanicEmail,
-    capabilities: {
-      card_payments: { requested: true },
-      transfers: { requested: true },
-    },
-  });
-
-  const updatedMechanicProfile = await MechanicProfile.findOneAndUpdate(
-    { email: mechanicEmail },
-    { stripeAccountId: encrypt(account.id) },
-    { new: true }
-  );
-
-  if (!updatedMechanicProfile) {
-    throw new AppError(status.NOT_FOUND, "Profile not found.");
+  if (!mechanicEmail || !mechanicEmail.includes("@")) {
+    throw new AppError(status.BAD_REQUEST, "Invalid email address");
   }
 
+  // Step 1: Fetch mechanic profile
+  const mechanicProfile = await MechanicProfile.findOne({
+    email: mechanicEmail,
+  });
+
+  if (!mechanicProfile) {
+    throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
+  }
+
+  let stripeAccountId: string;
+
+  // Step 2: Check if Stripe account already exists
+  if (mechanicProfile.stripeAccountId) {
+    stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
+  } else {
+    // Step 3: Create new Stripe account if not found
+    const account = await stripe.accounts.create({
+      country: "US",
+      type: "express",
+      email: mechanicEmail,
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+    });
+
+    // Step 4: Save new Stripe account ID to mechanic profile
+    stripeAccountId = account.id;
+    mechanicProfile.stripeAccountId = encrypt(account.id);
+    await mechanicProfile.save();
+  }
+
+  // Step 5: Create onboarding link
   const accountLink = await stripe.accountLinks.create({
-    account: decrypt(updatedMechanicProfile?.stripeAccountId),
+    account: stripeAccountId,
     refresh_url: `${appConfig.server.base_url}/stripe/onboarding/refresh`,
     return_url: `${appConfig.server.base_url}/stripe/onboarding/success`,
     type: "account_onboarding",
+    collect: "eventually_due", // optional: ensures missing info is collected
   });
-  return { url: accountLink.url, accountId: account.id };
+
+  return {
+    url: accountLink.url,
+    accountId: stripeAccountId,
+  };
 };
 
 const refundPayment = async (txId: string) => {
@@ -218,8 +240,98 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
   logger.info(event.type);
 
   switch (event.type) {
-    case "payment_intent.succeeded": {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    // case "payment_intent.succeeded": {
+    //   const paymentIntent = event.data.object as Stripe.PaymentIntent;
+
+    //   break;
+    // }
+    case "transfer.created": {
+      const transfer = event.data.object as Stripe.Transfer;
+
+      const chargeId = transfer.source_transaction;
+
+      if (!chargeId) {
+        console.warn("No source_transaction found on transfer");
+        break;
+      }
+
+      // Step 1: Retrieve the Charge object
+      const charge = await stripe.charges.retrieve(chargeId as string);
+
+      // Step 2: Get the PaymentIntent ID from the charge
+      const paymentIntentId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+
+      if (!paymentIntentId) {
+        console.warn("No PaymentIntent found for charge");
+        break;
+      }
+
+      // Step 3: Retrieve the PaymentIntent
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+
+      // Step 4: Access metadata
+      const metadata = paymentIntent.metadata;
+
+      console.dir(metadata, { depth: null });
+
+      await Payment.findOneAndUpdate(
+        { txId: paymentIntentId },
+        { isPaymentTransfered: true }
+      );
+
+      break;
+    }
+    case "charge.captured": {
+      const charge = event.data.object as Stripe.Charge;
+
+      const paymentIntentId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+
+      if (!paymentIntentId) {
+        logger.error("❌ Captured charge is missing paymentIntent reference.");
+        break;
+      }
+
+      await Payment.findOneAndUpdate(
+        { txId: paymentIntentId },
+        { isPaymentTransfered: true }
+      );
+
+      break;
+    }
+
+    case "charge.succeeded": {
+      const charge = event.data.object as Stripe.Charge;
+
+      const paymentIntentId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id;
+
+      if (!paymentIntentId) {
+        logger.error("❌ charge has no associated payment_intent");
+        break;
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
+      );
+      // const metadata = paymentIntent.metadata;
+
+      // console.log("✅ Charge succeeded for:", metadata);
+
+      // // Example usage:
+      // const bidId = metadata.bidId;
+      // const userId = metadata.userId;
+      // const serviceId = metadata.serviceId;
+      // const mechanicId = metadata.mechanicId;
 
       await handleSuccessfulPaymentIntent(paymentIntent);
 

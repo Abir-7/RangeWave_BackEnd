@@ -32,10 +32,10 @@ const paymentSchema: Schema<IPayment> = new Schema(
         type: String,
         enum: Object.values(PaymentStatus),
         default: null,
-        required: true,
       },
       txId: { type: Schema.Types.ObjectId, default: null },
     },
+    isPaymentTransfered: { type: Boolean, default: false },
   },
   {
     timestamps: true, // adds createdAt and updatedAt
