@@ -51,6 +51,15 @@ const hireMechanic = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const acceptExtraWork = catchAsync(async (req: Request, res: Response) => {
+  const result = await ServiceService.acceptExtraWork(req.body);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Payment intent created for extra work successfully",
+    data: result,
+  });
+});
 
 const markServiceAsComplete = catchAsync(
   async (req: Request, res: Response) => {
@@ -177,6 +186,7 @@ export const ServiceController = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
+  acceptExtraWork,
   cancelService,
 
   seeServiceDetails,

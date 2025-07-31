@@ -6,6 +6,7 @@ import Bid from "./bid.model";
 import { Status } from "../service/service.interface";
 import { Service } from "../service/service.model";
 import { getSocket } from "../../../socket/socket";
+import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -22,14 +23,14 @@ const addBid = async (
     status: Status.FINDING,
   });
 
-  // const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
+  const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
 
-  // if (!mechaniceProfile || !mechaniceProfile.stripeAccountId) {
-  //   throw new AppError(
-  //     status.NOT_FOUND,
-  //     "Profile or stripe account id not found."
-  //   );
-  // }
+  if (!mechaniceProfile || !mechaniceProfile.stripeAccountId) {
+    throw new AppError(
+      status.NOT_FOUND,
+      "Profile or stripe account id not found."
+    );
+  }
 
   if (!isServiceExist) {
     throw new AppError(status.NOT_FOUND, "Service req not found");

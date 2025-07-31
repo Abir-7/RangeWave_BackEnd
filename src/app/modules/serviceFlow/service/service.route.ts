@@ -27,6 +27,11 @@ router.patch(
   auth("USER"),
   ServiceController.markServiceAsComplete
 );
+router.patch(
+  "/accept-extra-work",
+  auth("USER"),
+  ServiceController.acceptExtraWork
+);
 
 //-----------------------------------------for mechanics-------------------------------
 router.post(

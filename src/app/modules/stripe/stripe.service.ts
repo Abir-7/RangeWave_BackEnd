@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import mongoose, { Types } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
@@ -20,6 +19,8 @@ import logger from "../../utils/logger";
 import Stripe from "stripe";
 import User from "../users/user/user.model";
 import { UserProfile } from "../users/userProfile/userProfile.model";
+import { ExtraWork } from "../serviceFlow/extraWork/extraWork.model";
+import { ExtraWorkStatus } from "../serviceFlow/extraWork/extraWork.interface";
 
 const createAndConnect = async (mechanicEmail: string) => {
   if (!mechanicEmail || !mechanicEmail.includes("@")) {
@@ -87,29 +88,6 @@ const refundPayment = async (txId: string) => {
 
   return refund;
 };
-
-const saveExtraWorkPayment = async (sId: string, txId: string) => {
-  const saveData = await Payment.findOne({ serviceId: sId });
-  if (!saveData) {
-    throw new AppError(status.NOT_FOUND, "payment data not found.");
-  }
-
-  saveData.extraPay.status = PaymentStatus.HOLD;
-  saveData.extraPay.txId = txId;
-  return await saveData.save();
-};
-
-// const getExpressAccountLoginLink = async (userId: string) => {
-//   const userData = await MechanicProfile.findOne({ user: userId });
-
-//   if (!userData) {
-//     throw new AppError(status.NOT_FOUND, "Profile not found.");
-//   }
-
-//   const stripeAccountId = decrypt(userData.stripeAccountId);
-//   const loginLink = await stripe.accounts.createLoginLink(stripeAccountId);
-//   return loginLink.url;
-// };
 
 // its only use when hire mecanic function is call is service.service.ts file
 const createPaymentIntent = async (data: {
@@ -224,6 +202,84 @@ const createPaymentIntent = async (data: {
   };
 };
 
+const createPaymentIntentForExtraWork = async (data: {
+  pId: string;
+  isForExtraWork: boolean;
+  extraWorkId: string;
+}) => {
+  const payment = await Payment.findById(data.pId);
+  console.log("object 1");
+  if (!payment) throw new Error("Payment not found");
+
+  // Step 1: Check if valid txId exists and is usable
+  if (payment.extraPay?.txId) {
+    const existingIntent = await stripe.paymentIntents.retrieve(
+      payment.extraPay.txId
+    );
+
+    const validStatuses = [
+      "requires_payment_method",
+      "requires_confirmation",
+      "requires_action",
+    ];
+
+    if (
+      existingIntent &&
+      validStatuses.includes(existingIntent.status) &&
+      payment.extraPay.status === PaymentStatus.UNPAID
+    ) {
+      return { paymentIntent: existingIntent.client_secret };
+    }
+  }
+
+  // Step 2: Fetch extra work info from DB
+  const extraWork = await ExtraWork.findOne({
+    _id: data.extraWorkId,
+    status: ExtraWorkStatus.WAITING,
+  });
+
+  if (!extraWork) throw new Error("Extra work not found");
+
+  const amount = Math.round(extraWork.price * 100); // cents
+
+  console.log(extraWork.mechanicId);
+  // Step 3: Create new payment intent
+
+  const mechaProfile = await MechanicProfile.findOne({
+    user: extraWork.mechanicId,
+  });
+  if (!mechaProfile) throw new Error("Mechanic Profile not found");
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount,
+    currency: "usd",
+    automatic_payment_methods: { enabled: true },
+    capture_method: "manual", // or "manual" if you want to capture later
+    transfer_data: {
+      destination: decrypt(mechaProfile.stripeAccountId), // <--- add this!
+    },
+    metadata: {
+      pId: data.pId,
+      isForExtraWork: data.isForExtraWork ? "yes" : "no",
+      extraWorkId: data.extraWorkId,
+    },
+  });
+
+  // Step 4: Save new txId and status to Payment.extraPay
+  payment.extraPay = {
+    extraWorkId: extraWork._id,
+    txId: paymentIntent.id,
+    status: PaymentStatus.UNPAID,
+    isPaymentTransfered: false,
+  };
+
+  await payment.save();
+  console.log("object");
+  return {
+    paymentIntent: paymentIntent.client_secret,
+  };
+};
+
 const stripeWebhook = async (rawBody: Buffer, sig: string) => {
   let event: Stripe.Event;
 
@@ -251,33 +307,21 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
       const chargeId = transfer.source_transaction;
 
       if (!chargeId) {
-        console.warn("No source_transaction found on transfer");
+        throw new Error("No source_transaction found on transfer");
         break;
       }
 
-      // Step 1: Retrieve the Charge object
       const charge = await stripe.charges.retrieve(chargeId as string);
 
-      // Step 2: Get the PaymentIntent ID from the charge
       const paymentIntentId =
         typeof charge.payment_intent === "string"
           ? charge.payment_intent
           : charge.payment_intent?.id;
 
       if (!paymentIntentId) {
-        console.warn("No PaymentIntent found for charge");
+        throw new Error("No PaymentIntent found for charge");
         break;
       }
-
-      // Step 3: Retrieve the PaymentIntent
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId
-      );
-
-      // Step 4: Access metadata
-      const metadata = paymentIntent.metadata;
-
-      console.dir(metadata, { depth: null });
 
       await Payment.findOneAndUpdate(
         { txId: paymentIntentId },
@@ -295,14 +339,41 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
           : charge.payment_intent?.id;
 
       if (!paymentIntentId) {
-        logger.error("❌ Captured charge is missing paymentIntent reference.");
+        logger.error("Charge has no associated payment_intent");
         break;
       }
 
-      await Payment.findOneAndUpdate(
-        { txId: paymentIntentId },
-        { isPaymentTransfered: true }
+      const paymentIntent = await stripe.paymentIntents.retrieve(
+        paymentIntentId
       );
+      const metadata = paymentIntent.metadata;
+
+      if (metadata.isForExtraWork === "no") {
+        if (!paymentIntentId) {
+          logger.error("Captured charge is missing paymentIntent reference.");
+          break;
+        }
+
+        await Payment.findOneAndUpdate(
+          { txId: paymentIntentId },
+          { isPaymentTransfered: true }
+        );
+        break;
+      }
+
+      if (metadata.isForExtraWork === "yes") {
+        const pId = metadata.pId;
+        const paymentData = await Payment.findOne({ _id: pId });
+
+        if (!paymentData) {
+          throw new AppError(
+            status.NOT_FOUND,
+            "Payment data not found for extra pay"
+          );
+        }
+        paymentData.extraPay.isPaymentTransfered = true;
+        break;
+      }
 
       break;
     }
@@ -316,24 +387,42 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
           : charge.payment_intent?.id;
 
       if (!paymentIntentId) {
-        logger.error("❌ charge has no associated payment_intent");
+        logger.error("Charge has no associated payment_intent");
         break;
       }
 
       const paymentIntent = await stripe.paymentIntents.retrieve(
         paymentIntentId
       );
-      // const metadata = paymentIntent.metadata;
+      const metadata = paymentIntent.metadata;
 
-      // console.log("✅ Charge succeeded for:", metadata);
+      if (metadata.isForExtraWork === "no") {
+        await handleSuccessfulPaymentIntent(paymentIntent);
+      }
 
-      // // Example usage:
-      // const bidId = metadata.bidId;
-      // const userId = metadata.userId;
-      // const serviceId = metadata.serviceId;
-      // const mechanicId = metadata.mechanicId;
+      if (metadata.isForExtraWork === "yes" && metadata.extraWorkId) {
+        const pId = metadata.pId;
+        const eId = metadata.extraWorkId;
 
-      await handleSuccessfulPaymentIntent(paymentIntent);
+        const paymentData = await Payment.findOne({ _id: pId });
+        if (!paymentData) {
+          throw new AppError(
+            status.NOT_FOUND,
+            "Payment data not found for extra pay"
+          );
+        }
+        paymentData.extraPay.status = PaymentStatus.PAID;
+
+        const eWorkData = await ExtraWork.findOne({ _id: eId });
+
+        if (!eWorkData) {
+          throw new AppError(
+            status.NOT_FOUND,
+            "Extra work data not found for extra pay"
+          );
+        }
+        eWorkData.status = ExtraWorkStatus.ACCEPTED;
+      }
 
       break;
     }
@@ -343,18 +432,20 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const metadata = paymentIntent.metadata;
 
-      logger.warn(`❌ Payment ${event.type} for Bid ID: ${metadata.bidId}`);
+      logger.warn(`Payment ${event.type} for Bid ID: ${metadata.bidId}`);
 
-      await Payment.findOneAndUpdate(
-        {
-          bidId: metadata.bidId,
-          serviceId: metadata.serviceId,
-          txId: paymentIntent.id,
-        },
-        {
-          status: PaymentStatus.CANCELLED,
-        }
-      );
+      if (metadata.isForExtraWork === "no") {
+        await Payment.findOneAndUpdate(
+          {
+            bidId: metadata.bidId,
+            serviceId: metadata.serviceId,
+            txId: paymentIntent.id,
+          },
+          {
+            status: PaymentStatus.CANCELLED,
+          }
+        );
+      }
 
       break;
     }
@@ -367,9 +458,10 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
 export const StripeService = {
   createAndConnect,
   createPaymentIntent,
+  createPaymentIntentForExtraWork,
 
   refundPayment,
-  saveExtraWorkPayment,
+
   stripeWebhook,
 };
 

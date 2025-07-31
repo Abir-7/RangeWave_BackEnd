@@ -7,6 +7,7 @@ export interface IExtraWork {
   bidId: Types.ObjectId;
   reqServiceId: Types.ObjectId;
   status: ExtraWorkStatus;
+  mechanicId: Types.ObjectId;
 }
 
 export enum ExtraWorkStatus {

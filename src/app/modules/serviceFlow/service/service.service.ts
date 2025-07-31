@@ -265,7 +265,10 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 // call payment intent function from stripe.service.ts file
 
 const hireMechanic = async (data: { bidId: string }, userId: string) => {
-  const bidData = await Bid.findById(data.bidId);
+  const bidData = await Bid.findOne({
+    _id: data.bidId,
+    status: BidStatus.provided,
+  });
 
   if (!bidData) {
     throw new AppError(status.NOT_FOUND, "Bid data not found");
@@ -288,8 +291,10 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
     throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
   }
 
+  console.log(userMechanic);
+
   if (!userMechanic.stripeAccountId) {
-    throw new AppError(status.NOT_FOUND, "Account id not found.");
+    throw new AppError(status.NOT_FOUND, "Stripe Account id not found.");
   }
 
   const paymentIntentData = {
@@ -310,9 +315,18 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
 
   return {
     bidId: data.bidId,
-    result,
+    ...result,
     serviceId: bidData.reqServiceId,
   };
+};
+
+const acceptExtraWork = async (data: { pId: string; extraWorkId: string }) => {
+  const result = await StripeService.createPaymentIntentForExtraWork({
+    pId: data.pId,
+    isForExtraWork: true,
+    extraWorkId: data.extraWorkId,
+  });
+  return result;
 };
 
 const markServiceAsComplete = async (pId: string) => {
@@ -347,7 +361,7 @@ const markServiceAsComplete = async (pId: string) => {
 
     // 6. Get main payment intent
     const res = await stripe.paymentIntents.capture(paymentData.txId);
-    console.log(res);
+
     await serviceData.save({ session });
 
     // 11. Emit socket event
@@ -674,13 +688,21 @@ const seeCurrentServiceProgress = async (pId: string) => {
     .populate({
       path: "serviceId",
       select: " -updatedAt  -createdAt",
-      populate: {
-        path: "user",
-        model: "UserProfile",
-        localField: "user",
-        foreignField: "user",
-        select: "-location   -dateOfBirth  -carInfo  -updatedAt  -createdAt",
-      },
+      populate: [
+        {
+          path: "user",
+          model: "UserProfile",
+          localField: "user",
+          foreignField: "user",
+          select: "-location -dateOfBirth -carInfo -updatedAt -createdAt",
+        },
+        {
+          path: "extraWork",
+          model: "ExtraWork",
+          localField: "extraWork",
+          foreignField: "_id",
+        },
+      ],
     })
     .populate({
       path: "bidId",
@@ -694,7 +716,12 @@ const seeCurrentServiceProgress = async (pId: string) => {
           "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
       },
     })
+
     .lean();
+
+  if (!serviceData) {
+    throw new AppError(status.NOT_FOUND, "No data found.");
+  }
 
   return serviceData;
 };
@@ -1016,6 +1043,7 @@ export const ServiceService = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
+  acceptExtraWork,
   cancelService,
   seeServiceDetails,
 

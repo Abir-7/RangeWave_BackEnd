@@ -9,6 +9,7 @@ export interface IPayment {
     extraWorkId: Types.ObjectId;
     txId: string;
     status: PaymentStatus;
+    isPaymentTransfered: boolean;
   }; //! todo make function for extrapay
   transferId: string;
   user: Types.ObjectId;

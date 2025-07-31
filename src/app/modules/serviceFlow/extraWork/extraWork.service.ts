@@ -12,6 +12,8 @@ import { ExtraWorkStatus } from "./extraWork.interface";
 import { StripeService } from "../../stripe/stripe.service";
 import Payment from "../../stripe/payment.model";
 import { PaymentStatus } from "../../stripe/payment.interface";
+import Bid from "../bid/bid.model";
+import { BidStatus } from "../bid/bid.interface";
 
 const reqForExtraWork = async (
   idData: {
@@ -30,15 +32,26 @@ const reqForExtraWork = async (
   try {
     const serviceData = await Service.findById(idData.sId).session(session);
 
+    const bidData = await Bid.findOne({
+      _id: idData.bId,
+      status: BidStatus.provided,
+    }).session(session);
+
     if (!serviceData) {
       throw new AppError(status.NOT_FOUND, "Service not found");
     }
-    if (serviceData.extraWork) {
+
+    if (!bidData) {
+      throw new AppError(status.NOT_FOUND, "Bid data not found");
+    }
+
+    if (serviceData.extraWork || bidData.extraWork) {
       throw new AppError(
         status.BAD_REQUEST,
         "Already requested for extra work"
       );
     }
+
     if (serviceData.status !== Status.WORKING) {
       throw new AppError(
         status.BAD_REQUEST,
@@ -47,16 +60,26 @@ const reqForExtraWork = async (
     }
 
     const extraWork = await ExtraWork.create(
-      [{ ...data, reqServiceId: idData.sId, bidId: idData.bId }],
+      [
+        {
+          ...data,
+          reqServiceId: idData.sId,
+          bidId: idData.bId,
+          mechanicId: bidData.mechanicId,
+        },
+      ],
       {
         session,
       }
     );
 
     serviceData.extraWork = extraWork[0]._id;
-    await serviceData.save({ session });
+    bidData.extraWork = extraWork[0]._id;
 
+    await serviceData.save({ session });
+    await bidData.save({ session });
     const io = getSocket();
+
     // socket-emit
     io.emit("extra-work", { serviceId: idData.sId });
 

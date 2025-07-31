@@ -10,7 +10,11 @@ import { StripeController } from "./app/modules/stripe/stripe.controller";
 const app = express();
 
 const corsOption = {
-  origin: ["*", "http://10.10.12.62:3000"],
+  origin: [
+    "*",
+    "http://10.10.12.62:3000",
+    "https://stripe-front-end.vercel.app",
+  ],
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
 };

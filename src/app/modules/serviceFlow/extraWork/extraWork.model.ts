@@ -16,7 +16,7 @@ const ExtraWorkSchema: Schema<IExtraWork> = new Schema(
       ref: "Service",
       required: true,
     },
-
+    mechanicId: { type: Schema.Types.ObjectId, required: true },
     status: {
       type: String,
       enum: Object.values(ExtraWorkStatus), // ensures status only uses enum values
