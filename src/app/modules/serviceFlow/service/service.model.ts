@@ -10,11 +10,7 @@ const serviceSchema = new Schema<IService>(
   {
     issue: { type: String, required: true },
     description: { type: String, required: true },
-    extraWork: {
-      type: Schema.Types.ObjectId,
-      ref: "ExtraWork",
-      default: null,
-    },
+
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: {
       type: String,
@@ -44,6 +40,12 @@ const serviceSchema = new Schema<IService>(
           type: [Number], // Array of numbers (longitude, latitude)
         },
       },
+    },
+
+    bidId: {
+      type: Schema.Types.ObjectId,
+      ref: "Bid",
+      default: null,
     },
 
     schedule: {

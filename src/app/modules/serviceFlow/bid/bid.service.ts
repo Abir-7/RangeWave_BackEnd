@@ -1,12 +1,15 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../../errors/AppError";
 
-import { BidStatus, IBid } from "./bid.interface";
-import Bid from "./bid.model";
+import { BidStatus } from "./bid.interface";
+
 import { Status } from "../service/service.interface";
 import { Service } from "../service/service.model";
 import { getSocket } from "../../../socket/socket";
 import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
+
+import { Bid } from "./bid.model";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -17,7 +20,7 @@ const addBid = async (
     placeId: string;
   },
   userId: string
-): Promise<IBid> => {
+) => {
   const isServiceExist = await Service.findOne({
     _id: bidData.reqServiceId,
     status: Status.FINDING,
@@ -25,7 +28,7 @@ const addBid = async (
 
   const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
 
-  if (!mechaniceProfile || !mechaniceProfile.stripeAccountId) {
+  if (!mechaniceProfile) {
     throw new AppError(
       status.NOT_FOUND,
       "Profile or stripe account id not found."
@@ -63,6 +66,11 @@ const addBid = async (
 
     mechanicId: userId,
     status: BidStatus.provided,
+    extraWork: {
+      price: 0,
+      description: "",
+      issue: "",
+    },
   });
 
   const io = getSocket();
@@ -77,7 +85,7 @@ const addBid = async (
 const declinedBid = async (
   bidData: { reqServiceId: string },
   userId: string
-): Promise<IBid> => {
+) => {
   const isServiceExist = await Service.findOne({
     _id: bidData.reqServiceId,
     status: Status.FINDING,
@@ -105,6 +113,11 @@ const declinedBid = async (
     price: 0,
     mechanicId: userId,
     status: BidStatus.declined,
+    extraWork: {
+      price: 0,
+      description: "",
+      issue: "",
+    },
   });
   return service;
 };

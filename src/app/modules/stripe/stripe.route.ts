@@ -10,5 +10,4 @@ router.post(
   StripeController.createAndConnect
 );
 
-router.post("/refund-payment", auth("ADMIN"), StripeController.refundPayment);
 export const StripeRoute = router;

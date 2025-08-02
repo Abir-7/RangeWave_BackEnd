@@ -42,21 +42,13 @@ const getBidListOfService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
 const hireMechanic = catchAsync(async (req: Request, res: Response) => {
   const result = await ServiceService.hireMechanic(req.body, req.user.userId);
   sendResponse(res, {
     success: true,
     statusCode: 200,
     message: "Payment intent created successfully",
-    data: result,
-  });
-});
-const acceptExtraWork = catchAsync(async (req: Request, res: Response) => {
-  const result = await ServiceService.acceptExtraWork(req.body);
-  sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: "Payment intent created for extra work successfully",
     data: result,
   });
 });
@@ -142,7 +134,11 @@ const seeServiceDetails = catchAsync(async (req: Request, res: Response) => {
 const changeServiceStatus = catchAsync(async (req: Request, res: Response) => {
   const { pId } = req.params;
 
-  const result = await ServiceService.changeServiceStatus(pId, req.body.status);
+  const result = await ServiceService.changeServiceStatus(
+    pId,
+    req.body.status,
+    req.body.extraWork
+  );
   sendResponse(res, {
     success: true,
     statusCode: 200,
@@ -186,7 +182,7 @@ export const ServiceController = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
-  acceptExtraWork,
+
   cancelService,
 
   seeServiceDetails,

@@ -5,7 +5,11 @@ export interface IBid {
   reqServiceId: Types.ObjectId;
   mechanicId: Types.ObjectId;
   status: BidStatus;
-  extraWork: Types.ObjectId;
+  extraWork: {
+    issue: string;
+    description: string;
+    price: number;
+  };
   location: {
     placeId: string;
     coordinates: {

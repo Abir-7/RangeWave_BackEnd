@@ -11,7 +11,6 @@ import { UserRatingRoute } from "../modules/rating/userRating/userRating.route";
 import { StripeRoute } from "../modules/stripe/stripe.route";
 import { ChatRoute } from "../modules/chat/room/room.route";
 import { MessageRoute } from "../modules/chat/message/message.route";
-import { ExtraWorkRoute } from "../modules/serviceFlow/extraWork/extraWork.route";
 
 const router = Router();
 
@@ -21,7 +20,7 @@ const apiRoutes = [
   { path: "/user", route: UserProfileRoute },
   { path: "/auth", route: AuthRoute },
   { path: "/service", route: ServiceRoute },
-  { path: "/extra-work", route: ExtraWorkRoute },
+
   { path: "/bid", route: BidRoute },
   { path: "/rating", route: MechanicRatingRoute },
   { path: "/rating", route: UserRatingRoute },

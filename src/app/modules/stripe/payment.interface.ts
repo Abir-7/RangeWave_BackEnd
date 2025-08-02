@@ -4,21 +4,21 @@ export interface IPayment {
   txId: string;
   bidId: Types.ObjectId;
   serviceId: Types.ObjectId;
-  status: PaymentStatus;
-  extraPay: {
-    extraWorkId: Types.ObjectId;
-    txId: string;
-    status: PaymentStatus;
-    isPaymentTransfered: boolean;
-  }; //! todo make function for extrapay
-  transferId: string;
   user: Types.ObjectId;
-  isPaymentTransfered: boolean;
+  mechanicId: Types.ObjectId;
+  status: PaymentStatus;
+  paymentType: PaymentType;
+  amount: number;
+  extraAmount: number;
+}
+
+export enum PaymentType {
+  ONLINE = "ONLINE",
+  OFFLINE = "OFFLINE",
 }
 
 export enum PaymentStatus {
-  HOLD = "HOLD",
-  CANCELLED = "CANCELLED", // or "CANCELED"
+  CANCELLED = "CANCELLED",
   PAID = "PAID",
   UNPAID = "UNPAID",
   REFUNDED = "REFUNDED",

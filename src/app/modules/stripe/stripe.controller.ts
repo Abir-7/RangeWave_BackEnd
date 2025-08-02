@@ -15,16 +15,6 @@ const createAndConnect = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const refundPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await StripeService.refundPayment(req.body.bidId);
-  sendResponse(res, {
-    success: true,
-    statusCode: 200,
-    message: "Success",
-    data: result,
-  });
-});
-
 const stripeWebhook = catchAsync(async (req, res) => {
   const sig = req.headers["stripe-signature"] as string;
   const rawBody = req.body;
@@ -41,6 +31,5 @@ const stripeWebhook = catchAsync(async (req, res) => {
 
 export const StripeController = {
   createAndConnect,
-  refundPayment,
   stripeWebhook,
 };

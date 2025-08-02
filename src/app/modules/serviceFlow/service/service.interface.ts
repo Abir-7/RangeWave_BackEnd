@@ -14,12 +14,13 @@ export interface IService {
     }; // [longitude, latitude]
   };
 
-  extraWork: Types.ObjectId;
   schedule: {
     isSchedule: boolean;
     date: Date;
   };
   cancelReson: CancelReason;
+
+  bidId: Types.ObjectId;
 }
 
 export enum Status {

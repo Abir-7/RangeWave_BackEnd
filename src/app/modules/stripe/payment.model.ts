@@ -1,19 +1,33 @@
-import mongoose, { Model, Schema } from "mongoose";
-import { IPayment, PaymentStatus } from "./payment.interface";
+import { Schema, model, Model } from "mongoose";
+import { IPayment, PaymentStatus, PaymentType } from "./payment.interface";
 
-const paymentSchema: Schema<IPayment> = new Schema(
+const paymentSchema = new Schema<IPayment>(
   {
-    txId: { type: String, unique: true, sparse: true },
-    transferId: { type: String, unique: true, sparse: true },
+    txId: {
+      type: String,
+      required: function () {
+        return this.paymentType === PaymentType.ONLINE;
+      },
+      trim: true,
+    },
     bidId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Bid",
       required: true,
     },
-    user: { type: Schema.Types.ObjectId, required: true, ref: "User" },
     serviceId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Service",
+      required: true,
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    mechanicId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
     status: {
@@ -22,30 +36,26 @@ const paymentSchema: Schema<IPayment> = new Schema(
       default: PaymentStatus.UNPAID,
       required: true,
     },
-    extraPay: {
-      work: {
-        type: Schema.Types.ObjectId,
-        ref: "ExtraWork",
-        default: null,
-      },
-      status: {
-        type: String,
-        enum: Object.values(PaymentStatus),
-        default: null,
-      },
-      txId: { type: String, default: null },
-      isPaymentTransfered: { type: Boolean, default: false },
+    paymentType: {
+      type: String,
+      enum: Object.values(PaymentType),
+      default: null,
     },
-    isPaymentTransfered: { type: Boolean, default: false },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    extraAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
-    timestamps: true, // adds createdAt and updatedAt
+    timestamps: true,
   }
 );
 
-const Payment: Model<IPayment> = mongoose.model<IPayment>(
-  "Payment",
-  paymentSchema
-);
-
+const Payment: Model<IPayment> = model<IPayment>("Payment", paymentSchema);
 export default Payment;

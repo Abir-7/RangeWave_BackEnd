@@ -5,7 +5,6 @@ import mongoose, { model, PipelineStage } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Service } from "./service.model";
 import { IService, IsServiceCompleted, Status } from "./service.interface";
-import Bid from "../bid/bid.model";
 
 import { StripeService } from "../../stripe/stripe.service";
 
@@ -21,8 +20,9 @@ import { stripe } from "../../stripe/stripe";
 import { decrypt } from "../../../utils/helper/encrypt&decrypt";
 import logger from "../../../utils/logger";
 import { BidStatus } from "../bid/bid.interface";
+import { Bid } from "../bid/bid.model";
 
-//! ----------------------------for users-------------------------------//
+//------------------------for users--------------------------//
 
 const addServiceReq = async (
   serviceData: {
@@ -118,38 +118,6 @@ const checkServiceStatusFinding = async (userId: string) => {
   return { immediateService, scheduledService };
 };
 
-//helper function
-const calculateDistance = (
-  coords1: [number, number],
-  coords2: [number, number]
-): number => {
-  const R = 6371; // km
-
-  const [lon1, lat1] = coords1;
-  const [lon2, lat2] = coords2;
-
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-
-  let dLon = lon2 - lon1;
-  if (dLon > 180) {
-    dLon -= 360;
-  } else if (dLon < -180) {
-    dLon += 360;
-  }
-  dLon = dLon * (Math.PI / 180);
-
-  const lat1Rad = lat1 * (Math.PI / 180);
-  const lat2Rad = lat2 * (Math.PI / 180);
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) ** 2;
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  console.log(coords1, coords2, Number((R * c).toFixed(2)));
-  return Number((R * c).toFixed(2));
-};
-
 const getBidListOfService = async (serviceId: string, userId: string) => {
   const service = await Service.findOne({
     _id: serviceId,
@@ -234,6 +202,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
         location: 1,
         "mechanicProfile.fullName": 1,
         "mechanicProfile.image": 1,
+        "mechanicProfile.email": 1,
         "mechanicProfile.workshop.name": 1,
         "mechanicProfile.workshop.location.placeId": 1,
         "mechanicProfile.workshop.location.coordinates":
@@ -243,147 +212,154 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
   ]);
 
   // Step 5: Add distance in Node.js (still more efficient this way)
-  return bids.map((bid) => {
-    const coords = bid.location?.coordinates?.coordinates;
+  return bids.map(
+    (bid: { location: { coordinates: { coordinates: any } } }) => {
+      const coords = bid.location?.coordinates?.coordinates;
 
-    const distance = coords
-      ? calculateDistance(
-          service.location.coordinates.coordinates as [number, number],
-          coords
-        )
-      : null;
+      const distance = coords
+        ? calculateDistance(
+            service.location.coordinates.coordinates as [number, number],
+            coords
+          )
+        : null;
 
-    return {
-      ...bid,
+      return {
+        ...bid,
 
-      distance:
-        distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
-    };
-  });
+        distance:
+          distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
+      };
+    }
+  );
 };
-
-// call payment intent function from stripe.service.ts file
 
 const hireMechanic = async (data: { bidId: string }, userId: string) => {
-  const bidData = await Bid.findOne({
-    _id: data.bidId,
-    status: BidStatus.provided,
-  });
-
-  if (!bidData) {
-    throw new AppError(status.NOT_FOUND, "Bid data not found");
-  }
-
-  const isServiceExist = await Service.findOne({
-    _id: bidData.reqServiceId,
-    user: userId,
-  });
-
-  if (!isServiceExist) {
-    throw new AppError(status.NOT_FOUND, "Service not found.");
-  }
-
-  const userMechanic = await MechanicProfile.findOne({
-    user: bidData.mechanicId,
-  });
-
-  if (!userMechanic) {
-    throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
-  }
-
-  console.log(userMechanic);
-
-  if (!userMechanic.stripeAccountId) {
-    throw new AppError(status.NOT_FOUND, "Stripe Account id not found.");
-  }
-
-  const paymentIntentData = {
-    bidId: bidData._id,
-    bidPrice: bidData.price,
-    serviceId: bidData.reqServiceId,
-    userId,
-    mechanicId: String(bidData.mechanicId),
-    accountId: decrypt(userMechanic?.stripeAccountId),
-  };
-
-  const result = await StripeService.createPaymentIntent({
-    ...paymentIntentData,
-    isForExtraWork: false,
-  });
-
-  // need to validate before payment done...if payment already done or not
-
-  return {
-    bidId: data.bidId,
-    ...result,
-    serviceId: bidData.reqServiceId,
-  };
-};
-
-const acceptExtraWork = async (data: { pId: string; extraWorkId: string }) => {
-  const result = await StripeService.createPaymentIntentForExtraWork({
-    pId: data.pId,
-    isForExtraWork: true,
-    extraWorkId: data.extraWorkId,
-  });
-  return result;
-};
-
-const markServiceAsComplete = async (pId: string) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    // 1. Get initial payment
-    const paymentData = await Payment.findById(pId).session(session);
-
-    if (!paymentData)
-      throw new AppError(status.NOT_FOUND, "Payment data not found.");
-
-    // 2. Get associated service
-    const serviceData = await Service.findOne({
-      _id: paymentData.serviceId,
-      status: Status.COMPLETED,
+    const bidData = await Bid.findOne({
+      _id: data.bidId,
+      status: BidStatus.provided,
     }).session(session);
 
-    if (!serviceData) {
-      throw new AppError(status.NOT_FOUND, "Service data not found.");
+    if (!bidData) {
+      throw new AppError(status.NOT_FOUND, "Bid data not found");
     }
 
-    if (serviceData.isServiceCompleted === IsServiceCompleted.YES) {
+    const isServiceExist = await Service.findOne({
+      _id: bidData.reqServiceId,
+      user: userId,
+    }).session(session);
+
+    if (!isServiceExist) {
+      throw new AppError(status.NOT_FOUND, "Service not found.");
+    }
+
+    if (
+      isServiceExist.status === Status.WAITING ||
+      isServiceExist.status === Status.COMPLETED ||
+      isServiceExist.status === Status.CANCELLED ||
+      isServiceExist.status === Status.WORKING
+    ) {
       throw new AppError(
         status.BAD_REQUEST,
-        "Service already marked as completed."
+        `Service status is ${isServiceExist.status}`
       );
     }
 
-    serviceData.isServiceCompleted = IsServiceCompleted.YES;
+    const userMechanic = await MechanicProfile.findOne({
+      user: bidData.mechanicId,
+    }).session(session);
 
-    // 6. Get main payment intent
-    const res = await stripe.paymentIntents.capture(paymentData.txId);
+    if (!userMechanic) {
+      throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
+    }
 
-    await serviceData.save({ session });
+    const extraPrice = bidData.extraWork?.price || 0;
+    const totalPrice = Number(bidData.price) + Number(extraPrice);
 
-    // 11. Emit socket event
-    getSocket().emit("markAsComplete", {
-      bidId: paymentData.bidId,
-      serviceId: paymentData.serviceId,
-      paymentId: paymentData._id,
-    });
+    const payment = await Payment.create(
+      [
+        {
+          amount: totalPrice,
+          bidId: bidData._id,
+          serviceId: isServiceExist._id,
+          mechanicId: bidData.mechanicId,
+          status: PaymentStatus.UNPAID,
+          user: isServiceExist.user,
+        },
+      ],
+      { session }
+    );
+
+    isServiceExist.bidId = bidData._id;
+    isServiceExist.status = Status.WAITING;
+    await isServiceExist.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
-    return serviceData;
-  } catch (error) {
+    //! Socket need------------------------------------------------
+
+    return payment[0]; // create returns an array
+  } catch (err: any) {
     await session.abortTransaction();
     session.endSession();
-    throw new Error((error as Error).message || "Unknown error");
+    throw new Error(err);
   }
 };
+const markServiceAsComplete = async (pId: string) => {
+  const paymentData = await Payment.findOne({
+    _id: pId,
+    status: PaymentStatus.UNPAID,
+  });
+  if (!paymentData) {
+    throw new AppError(status.NOT_FOUND, "Payment data not found.");
+  }
+  const totalCost =
+    (paymentData?.amount || 0) + (paymentData?.extraAmount || 0);
 
-//! --------------------------for mechanics and users-------------------------------//
+  if (totalCost === 0) {
+    throw new AppError(status.BAD_REQUEST, "Total amount can't be zero.");
+  }
 
+  const mechanicData = await MechanicProfile.findOne({
+    user: paymentData.mechanicId,
+  });
+
+  if (!mechanicData) {
+    throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
+  }
+
+  if (paymentData.status === PaymentStatus.UNPAID) {
+    const stripeIntent = await stripe.paymentIntents.retrieve(
+      paymentData.txId
+    );
+
+    if (
+      [
+        "requires_payment_method",
+        "requires_confirmation",
+        "requires_action",
+        "processing",
+      ].includes(stripeIntent.status)
+    ) {
+      return {
+        paymentIntent: stripeIntent.client_secret,
+      };
+    }
+
+
+  await StripeService.createPaymentIntent({
+    accountId: mechanicData.stripeAccountId,
+    bidId: String(paymentData.bidId),
+    serviceId: String(paymentData.serviceId),
+    price: totalCost,
+    userId: String(paymentData.user),
+  });
+};
+//-----------------------common----------------------------
 const getRunningService = async (userId: string) => {
   const activeStatuses = [Status.WORKING, Status.WAITING, Status.COMPLETED];
 
@@ -667,8 +643,6 @@ const cancelService = async (
     paymentData.status = PaymentStatus.REFUNDED;
     await paymentData.save({ session });
 
-    await StripeService.refundPayment(paymentData.txId);
-
     const io = getSocket();
     io.emit("cencel", { paymentId: pId });
 
@@ -726,7 +700,7 @@ const seeCurrentServiceProgress = async (pId: string) => {
   return serviceData;
 };
 
-//! ----------------------------for mechanics-------------------------------//
+//-------------------------------mechanic-------------------------------------------
 
 const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
   const aggregateArray: PipelineStage[] = [
@@ -828,45 +802,76 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
   return enriched;
 };
 
-const changeServiceStatus = async (pId: string, statusData: Status) => {
-  const paymentData = await Payment.findById(pId);
+const changeServiceStatus = async (
+  pId: string,
+  statusData: Status,
+  extraWork: { issue: string; description: string; price: number }
+) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!paymentData) {
-    throw new AppError(status.NOT_FOUND, "Payment data not found.");
-  }
+  try {
+    const paymentData = await Payment.findById(pId).session(session);
+    if (!paymentData) {
+      throw new AppError(status.NOT_FOUND, "Payment data not found.");
+    }
 
-  const bidData = await Bid.findOne({ _id: paymentData.bidId });
-
-  if (!bidData) {
-    throw new AppError(status.NOT_FOUND, "Bid data not found.");
-  }
-
-  const serviceData = await Service.findById(bidData.reqServiceId);
-
-  if (!serviceData) {
-    throw new AppError(status.NOT_FOUND, "Service data not found.");
-  }
-
-  if (serviceData?.status === Status.WAITING && statusData === Status.WORKING) {
-    serviceData.status = Status.WORKING;
-  } else if (
-    serviceData.status === Status.WORKING &&
-    statusData === Status.COMPLETED
-  ) {
-    serviceData.status = Status.COMPLETED;
-    serviceData.isServiceCompleted = IsServiceCompleted.WAITING;
-  } else {
-    throw new AppError(
-      status.BAD_REQUEST,
-      `Faild to change service status. Current status:${serviceData.status}`
+    const bidData = await Bid.findOne({ _id: paymentData.bidId }).session(
+      session
     );
+    if (!bidData) {
+      throw new AppError(status.NOT_FOUND, "Bid data not found.");
+    }
+
+    const serviceData = await Service.findById(bidData.reqServiceId).session(
+      session
+    );
+    if (!serviceData) {
+      throw new AppError(status.NOT_FOUND, "Service data not found.");
+    }
+
+    // Apply logic
+    if (
+      serviceData.status === Status.WAITING &&
+      statusData === Status.WORKING
+    ) {
+      if (extraWork.price > 0) {
+        bidData.extraWork = extraWork;
+        paymentData.extraAmount = extraWork.price;
+      }
+
+      serviceData.status = Status.WORKING;
+    } else if (
+      serviceData.status === Status.WORKING &&
+      statusData === Status.COMPLETED
+    ) {
+      serviceData.status = Status.COMPLETED;
+      serviceData.isServiceCompleted = IsServiceCompleted.WAITING;
+    } else {
+      throw new AppError(
+        status.BAD_REQUEST,
+        `Failed to change service status. Current status: ${serviceData.status}`
+      );
+    }
+
+    // Save all within transaction
+    await bidData.save({ session });
+    await paymentData.save({ session });
+    const newData = await serviceData.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Notify via socket outside transaction
+    const io = getSocket();
+    io.emit("service-status", { paymentId: pId });
+
+    return newData;
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
   }
-
-  const newData = await serviceData.save();
-
-  const io = getSocket();
-  io.emit("service-status", { paymentId: pId });
-  return newData;
 };
 
 const seeServiceDetails = async (sId: string) => {
@@ -896,7 +901,7 @@ const seeServiceDetails = async (sId: string) => {
   };
 };
 
-//-------------------------------------------------------------------------------------Api for socket -----------------------------------------------------------------
+//-----------------------------------Api for socket -------------------------------------
 
 const pushNewServiceReq = async (serviceId: string) => {
   const aggregateArray: PipelineStage[] = [
@@ -1043,7 +1048,7 @@ export const ServiceService = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
-  acceptExtraWork,
+
   cancelService,
   seeServiceDetails,
 
@@ -1054,4 +1059,36 @@ export const ServiceService = {
   addNewBidDataToService,
   changeServiceStatus,
   markServiceAsComplete,
+};
+
+//helper function
+const calculateDistance = (
+  coords1: [number, number],
+  coords2: [number, number]
+): number => {
+  const R = 6371; // km
+
+  const [lon1, lat1] = coords1;
+  const [lon2, lat2] = coords2;
+
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+
+  let dLon = lon2 - lon1;
+  if (dLon > 180) {
+    dLon -= 360;
+  } else if (dLon < -180) {
+    dLon += 360;
+  }
+  dLon = dLon * (Math.PI / 180);
+
+  const lat1Rad = lat1 * (Math.PI / 180);
+  const lat2Rad = lat2 * (Math.PI / 180);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return Number((R * c).toFixed(2));
 };
