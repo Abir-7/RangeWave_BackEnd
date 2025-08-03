@@ -54,8 +54,26 @@ const paymentSchema = new Schema<IPayment>(
   },
   {
     timestamps: true,
+    id: false,
   }
 );
+
+paymentSchema.virtual("mechanicProfile", {
+  ref: "MechanicProfile", // model name
+  localField: "mechanicId", // field in Payment
+  foreignField: "user", // field in MechanicProfile
+  justOne: true, // because one mechanicId -> one profile
+});
+
+paymentSchema.virtual("userProfile", {
+  ref: "UserProfile",
+  localField: "user", // in Payment
+  foreignField: "user", // in UserProfile
+  justOne: true,
+});
+
+paymentSchema.set("toObject", { virtuals: true });
+paymentSchema.set("toJSON", { virtuals: true });
 
 const Payment: Model<IPayment> = model<IPayment>("Payment", paymentSchema);
 export default Payment;

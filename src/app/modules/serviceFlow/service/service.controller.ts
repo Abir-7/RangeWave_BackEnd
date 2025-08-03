@@ -57,7 +57,10 @@ const markServiceAsComplete = catchAsync(
   async (req: Request, res: Response) => {
     const { pId } = req.params;
 
-    const result = await ServiceService.markServiceAsComplete(pId);
+    const result = await ServiceService.markServiceAsComplete(
+      pId,
+      req.body.paymentType
+    );
     sendResponse(res, {
       success: true,
       statusCode: 200,

@@ -1,3 +1,5 @@
+import { createRoomAfterHire } from "./../../chat/room/room.service";
+/* eslint-disable arrow-body-style */
 import { status } from "http-status";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -13,12 +15,10 @@ import AppError from "../../../errors/AppError";
 
 import { getSocket } from "../../../socket/socket";
 import Payment from "../../stripe/payment.model";
-import { PaymentStatus } from "../../stripe/payment.interface";
+import { PaymentStatus, PaymentType } from "../../stripe/payment.interface";
 
 import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
-import { stripe } from "../../stripe/stripe";
-import { decrypt } from "../../../utils/helper/encrypt&decrypt";
-import logger from "../../../utils/logger";
+
 import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
 
@@ -114,6 +114,10 @@ const checkServiceStatusFinding = async (userId: string) => {
 
   const immediateService = services.filter((s) => !s.schedule?.isSchedule);
   const scheduledService = services.filter((s) => s.schedule?.isSchedule);
+
+  if (immediateService.length === 0 && scheduledService.length === 0) {
+    throw new AppError(status.NOT_FOUND, "No service found");
+  }
 
   return { immediateService, scheduledService };
 };
@@ -296,11 +300,20 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
     isServiceExist.bidId = bidData._id;
     isServiceExist.status = Status.WAITING;
     await isServiceExist.save({ session });
+    await createRoomAfterHire(
+      [bidData.mechanicId.toString(), isServiceExist.user.toString()],
+      session
+    );
 
     await session.commitTransaction();
     session.endSession();
 
     //! Socket need------------------------------------------------
+    const io = getSocket();
+    io.emit(`hire-${bidData.mechanicId}`, {
+      serviceId: isServiceExist._id,
+      paymentId: payment[0]._id,
+    });
 
     return payment[0]; // create returns an array
   } catch (err: any) {
@@ -309,302 +322,104 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
     throw new Error(err);
   }
 };
-const markServiceAsComplete = async (pId: string) => {
-  const paymentData = await Payment.findOne({
-    _id: pId,
-    status: PaymentStatus.UNPAID,
-  });
-  if (!paymentData) {
-    throw new AppError(status.NOT_FOUND, "Payment data not found.");
+const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
+  console.log(paymentType);
+
+  if (
+    paymentType !== PaymentType.OFFLINE &&
+    paymentType !== PaymentType.ONLINE
+  ) {
+    throw new AppError(status.BAD_REQUEST, "Invalid payment  option.");
   }
-  const totalCost =
-    (paymentData?.amount || 0) + (paymentData?.extraAmount || 0);
+  if (paymentType === PaymentType.OFFLINE) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-  if (totalCost === 0) {
-    throw new AppError(status.BAD_REQUEST, "Total amount can't be zero.");
-  }
+    try {
+      const paymentData = await Payment.findOne({ _id: pId }).session(session);
+      if (!paymentData) {
+        throw new AppError(status.NOT_FOUND, "Payment data not found.");
+      }
 
-  const mechanicData = await MechanicProfile.findOne({
-    user: paymentData.mechanicId,
-  });
+      paymentData.paymentType = PaymentType.OFFLINE;
+      paymentData.status = PaymentStatus.PAID;
+      const serviceData = await Service.findOne({
+        _id: paymentData.serviceId,
+      }).session(session);
+      if (!serviceData) {
+        throw new AppError(status.NOT_FOUND, "Service data not found.");
+      }
 
-  if (!mechanicData) {
-    throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
-  }
+      serviceData.isServiceCompleted = IsServiceCompleted.YES;
 
-  if (paymentData.status === PaymentStatus.UNPAID) {
-    const stripeIntent = await stripe.paymentIntents.retrieve(
-      paymentData.txId
-    );
+      await Promise.all([
+        paymentData.save({ session }),
+        serviceData.save({ session }),
+      ]);
 
-    if (
-      [
-        "requires_payment_method",
-        "requires_confirmation",
-        "requires_action",
-        "processing",
-      ].includes(stripeIntent.status)
-    ) {
+      await session.commitTransaction();
+      session.endSession();
+
       return {
-        paymentIntent: stripeIntent.client_secret,
+        paymentIntent: "",
+        message: "Work mark as comleted.",
+        paymentType,
       };
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
     }
+  }
 
-
-  await StripeService.createPaymentIntent({
-    accountId: mechanicData.stripeAccountId,
-    bidId: String(paymentData.bidId),
-    serviceId: String(paymentData.serviceId),
-    price: totalCost,
-    userId: String(paymentData.user),
-  });
+  if (paymentType === PaymentType.ONLINE) {
+    const result = await StripeService.createPaymentIntent(pId);
+    return {
+      paymentIntent: result.paymentIntent,
+      message: "PaymentIntent Created",
+      paymentType,
+    };
+  }
 };
 //-----------------------common----------------------------
 const getRunningService = async (userId: string) => {
-  const activeStatuses = [Status.WORKING, Status.WAITING, Status.COMPLETED];
-
   const userData = await User.findById(userId).lean();
-  if (userData && userData.role === "USER") {
-    const serviceData = await Service.aggregate([
-      {
-        $match: {
-          status: { $in: activeStatuses },
-          user: new mongoose.Types.ObjectId(userId),
-        },
-      },
-      {
-        $lookup: {
-          from: "payments",
-          let: { serviceId: "$_id" },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $eq: ["$serviceId", "$$serviceId"] },
-              },
-            },
-            {
-              $lookup: {
-                from: "bids",
-                let: { bidId: "$bidId" },
-                pipeline: [
-                  {
-                    $match: {
-                      $expr: { $eq: ["$_id", "$$bidId"] },
-                    },
-                  },
-                  {
-                    $project: {
-                      _id: 1,
-                      mechanicId: 1,
-                      price: 1,
-                    },
-                  },
-                ],
-                as: "bid",
-              },
-            },
-            {
-              $unwind: "$bid",
-            },
-            {
-              $lookup: {
-                from: "users",
-                let: { mechanicId: "$bid.mechanicId" },
-                pipeline: [
-                  {
-                    $match: {
-                      $expr: { $eq: ["$_id", "$$mechanicId"] },
-                    },
-                  },
-                  {
-                    $lookup: {
-                      from: "mechanicprofiles",
-                      let: { userId: "$_id" },
-                      pipeline: [
-                        {
-                          $match: {
-                            $expr: { $eq: ["$user", "$$userId"] },
-                          },
-                        },
-                        {
-                          $project: {
-                            _id: 0,
-                            location: 0,
-                            workshop: 0,
-                            experience: 0,
-                            certificates: 0,
-                            createdAt: 0,
-                            updatedAt: 0,
-                            __v: 0,
-                          },
-                        },
-                      ],
-                      as: "profileData",
-                    },
-                  },
-                  {
-                    $unwind: {
-                      path: "$profileData",
-                      preserveNullAndEmptyArrays: true,
-                    },
-                  },
-                  {
-                    $project: {
-                      _id: 0,
-                      role: 1,
-                      profileData: 1,
-                    },
-                  },
-                ],
-                as: "mechanic",
-              },
-            },
-            {
-              $unwind: "$mechanic",
-            },
-            {
-              $project: {
-                _id: 1,
-                bidId: "$bid._id",
-                price: "$bid.price",
-                mechanic: 1,
-              },
-            },
-          ],
-          as: "paymentData",
-        },
-      },
-      {
-        $unwind: "$paymentData",
-      },
-      {
-        $project: {
-          _id: 1,
-          issue: 1,
-          description: 1,
-          user: 1,
-          schedule: 1,
-          status: 1,
-
-          bidData: {
-            bidId: "$paymentData.bidId",
-            price: "$paymentData.price",
-          },
-          profile: "$paymentData.mechanic",
-          paymentId: "$paymentData._id",
-        },
-      },
-    ]);
-
-    if (serviceData.length === 0) {
-      throw new Error("Service not found");
-    }
-
-    return serviceData;
-  } else if (userData && userData?.role === "MECHANIC") {
-    const serviceData = await Service.aggregate([
-      {
-        $match: {
-          status: { $in: activeStatuses },
-        },
-      },
-      {
-        $lookup: {
-          from: "payments",
-          localField: "_id",
-          foreignField: "serviceId",
-          pipeline: [
-            {
-              $lookup: {
-                from: "bids",
-                localField: "bidId",
-                foreignField: "_id",
-                pipeline: [
-                  {
-                    $match: { mechanicId: new mongoose.Types.ObjectId(userId) },
-                  },
-                ],
-                as: "bidData",
-              },
-            },
-            { $unwind: "$bidData" },
-          ],
-          as: "paymentData",
-        },
-      },
-
-      {
-        $unwind: {
-          path: "$paymentData",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-
-      {
-        $lookup: {
-          from: "users",
-          localField: "user",
-          foreignField: "_id",
-          pipeline: [
-            {
-              $lookup: {
-                from: "userprofiles",
-                localField: "_id",
-                foreignField: "user",
-                pipeline: [
-                  {
-                    $project: {
-                      createdAt: 0,
-                      updatedAt: 0,
-                      carInfo: 0,
-                      dateOfBirth: 0,
-                      location: 0,
-                      __v: 0,
-                    },
-                  },
-                ],
-                as: "profileData",
-              },
-            },
-            { $unwind: "$profileData" },
-            {
-              $project: {
-                _id: 0, // if you don't need user _id
-                role: 1, // keep from user collection
-                profileData: 1,
-              },
-            },
-          ],
-          as: "profile",
-        },
-      },
-      { $unwind: "$profile" },
-      {
-        $project: {
-          _id: 1,
-          issue: 1,
-          description: 1,
-          user: 1,
-          schedule: 1,
-          status: 1,
-          bidData: {
-            bidId: "$paymentData.bidId",
-            price: "$paymentData.bidData.price",
-          },
-          profile: 1,
-          paymentId: "$paymentData._id",
-        },
-      },
-    ]);
-
-    if (serviceData.length === 0) {
-      throw new Error("Service not found");
-    }
-
-    return serviceData;
+  if (!userData) {
+    throw new AppError(status.NOT_FOUND, "User not found.");
   }
-  throw new AppError(status.NOT_FOUND, "No active service found.");
+
+  let filter: any = {};
+  if (userData.role === "USER") {
+    filter = { status: PaymentStatus.UNPAID, user: userId }; //
+  } else if (userData.role === "MECHANIC") {
+    filter = { status: PaymentStatus.UNPAID, mechanicId: userId };
+  } else {
+    throw new AppError(status.BAD_REQUEST, "Invalid user role.");
+  }
+
+  const payments = await Payment.find(filter)
+    .populate({ path: "bidId", select: "price status extraWork location" })
+    .populate({
+      path: "serviceId",
+      select: "description status isServiceCompleted issue schedule location",
+    })
+    .populate({
+      path: "userProfile",
+      select: "-carInfo -createdAt -updatedAt -__v",
+    })
+    .populate({
+      path: "mechanicProfile",
+      select: "-workshop -experience -certificates -createdAt -updatedAt -__v",
+    })
+    .select("-id -__v -createdAt -updatedAt");
+
+  if (!payments.length) {
+    throw new AppError(status.NOT_FOUND, "Service not found.");
+  }
+
+  return payments;
 };
+
 const cancelService = async (
   pId: string,
   serviceData: { cancelReson: string }

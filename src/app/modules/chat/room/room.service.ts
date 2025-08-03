@@ -38,31 +38,6 @@ export const createRoomAfterHire = async (
   return newRoom;
 };
 
-const createRoom = async (users: [string, string]) => {
-  // 1. Check if both users exist
-  const foundUsers = await User.find({ _id: { $in: users } }).lean();
-
-  if (foundUsers.length !== 2) {
-    return "One or both users do not exist";
-  }
-
-  const existingRoom = await ChatRoom.findOne({
-    users: { $all: users, $size: 2 },
-  }).lean();
-
-  if (existingRoom) {
-    return existingRoom;
-  }
-
-  // 3. Create new chatroom if none found
-  const newRoom = new ChatRoom({
-    users,
-  });
-
-  await newRoom.save();
-
-  return newRoom;
-};
 const getChatList = async (userId: string) => {
   const data = await ChatRoom.aggregate([
     {
@@ -153,6 +128,5 @@ const getChatList = async (userId: string) => {
 };
 
 export const RoomService = {
-  createRoom,
   getChatList,
 };
