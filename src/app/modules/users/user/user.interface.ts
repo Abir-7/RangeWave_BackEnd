@@ -13,6 +13,7 @@ export interface IBaseUser {
   isVerified: boolean;
   needToResetPass: boolean;
   needToUpdateProfile: boolean;
+  isBlocked: boolean;
 }
 
 export interface IUser extends IBaseUser, Document {

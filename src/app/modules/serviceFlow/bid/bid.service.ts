@@ -1,3 +1,4 @@
+import { UserProfile } from "./../../users/userProfile/userProfile.model";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
 import AppError from "../../../errors/AppError";
@@ -75,11 +76,18 @@ const addBid = async (
 
   const io = getSocket();
 
+  const userProfile = await UserProfile.findOne({ user: isServiceExist.user });
+
+  const bidWithUserProfile = {
+    ...saveBid.toObject(), // converts Mongoose doc to plain object
+    userProfile,
+  };
+
   io.emit(`service-${saveBid.reqServiceId}`, {
     serviceId: saveBid.reqServiceId,
   });
 
-  return saveBid;
+  return bidWithUserProfile;
 };
 
 const declinedBid = async (
