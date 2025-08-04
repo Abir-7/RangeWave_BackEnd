@@ -422,24 +422,22 @@ const getRunningService = async (userId: string) => {
 
 const cancelService = async (
   pId: string,
-  serviceData: { cancelReson: string }
+  serviceData: { cancelReson: string },
+  userId: string
 ): Promise<IService> => {
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
-    const paymentData = await Payment.findOne({ _id: pId });
+    const paymentData = await Payment.findOne({
+      _id: pId,
+      status: PaymentStatus.UNPAID,
+      user: userId,
+    });
 
-    if (!paymentData || !paymentData.txId) {
+    if (!paymentData) {
       throw new AppError(status.NOT_FOUND, "Payment data not found");
-    }
-
-    // 2. Find the related bid inside the transaction
-    const bid = await Bid.findOne({ _id: paymentData?.bidId }).session(session);
-
-    if (!bid) {
-      throw new Error("Bid data not found");
     }
 
     const service = await Service.findByIdAndUpdate(
@@ -450,16 +448,15 @@ const cancelService = async (
         session,
       }
     );
-
     if (!service) {
       throw new Error("Service not found");
     }
 
-    paymentData.status = PaymentStatus.REFUNDED;
+    paymentData.status = PaymentStatus.CANCELLED;
     await paymentData.save({ session });
 
     const io = getSocket();
-    io.emit("cencel", { paymentId: pId });
+    io.emit(`cencel-${paymentData.mechanicId}`, { paymentId: pId });
 
     await session.commitTransaction();
     session.endSession();
@@ -474,38 +471,20 @@ const cancelService = async (
 };
 const seeCurrentServiceProgress = async (pId: string) => {
   const serviceData = await Payment.findOne({ _id: pId })
+    .populate({ path: "bidId", select: "price status extraWork location" })
     .populate({
       path: "serviceId",
-      select: " -updatedAt  -createdAt",
-      populate: [
-        {
-          path: "user",
-          model: "UserProfile",
-          localField: "user",
-          foreignField: "user",
-          select: "-location -dateOfBirth -carInfo -updatedAt -createdAt",
-        },
-        {
-          path: "extraWork",
-          model: "ExtraWork",
-          localField: "extraWork",
-          foreignField: "_id",
-        },
-      ],
+      select: "description status isServiceCompleted issue schedule location",
     })
     .populate({
-      path: "bidId",
-      select: "-createdAt -updatedAt -__v",
-      populate: {
-        path: "mechanicId",
-        model: "MechanicProfile",
-        localField: "mechanicId",
-        foreignField: "user",
-        select:
-          "-workshop -certificates -experience -createdAt -__v -updatedAt -location",
-      },
+      path: "userProfile",
+      select: "-carInfo -createdAt -updatedAt -__v",
     })
-
+    .populate({
+      path: "mechanicProfile",
+      select: "-workshop -experience -certificates -createdAt -updatedAt -__v",
+    })
+    .select("-id -__v -createdAt -updatedAt")
     .lean();
 
   if (!serviceData) {

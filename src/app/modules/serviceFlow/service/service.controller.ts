@@ -99,7 +99,11 @@ const seeCurrentServiceProgress = catchAsync(
 const cancelService = catchAsync(async (req: Request, res: Response) => {
   const { pId } = req.params;
   const serviceData = req.body;
-  const result = await ServiceService.cancelService(pId, serviceData);
+  const result = await ServiceService.cancelService(
+    pId,
+    serviceData,
+    req.user.userId
+  );
   sendResponse(res, {
     success: true,
     statusCode: 200,

@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { userRoles } from "../../interface/auth.interface";
 import { Service } from "../serviceFlow/service/service.model";
+import Payment from "../stripe/payment.model";
 import User from "../users/user/user.model";
 
 const dashboardData = async () => {
@@ -60,7 +62,82 @@ const dashboardData = async () => {
     totalUser, // For overview count
   };
 };
+const paymentHistory = async () => {
+  const history = await Payment.find()
+    .populate({ path: "bidId", select: "price status extraWork location" })
+    .populate({
+      path: "serviceId",
+      select: "description status isServiceCompleted issue schedule location",
+    })
+    .populate({
+      path: "userProfile",
+      select: "-carInfo -createdAt -updatedAt -__v",
+    })
+    .populate({
+      path: "mechanicProfile",
+      select: "-workshop -experience -certificates -createdAt -updatedAt -__v",
+    })
+    .select("-id -__v -createdAt -updatedAt")
+    .lean();
+
+  return history;
+};
+
+const getUsersByRole = async (role: "USER" | "MECHANIC") => {
+  const roleFilter =
+    role === "USER"
+      ? ["USER"]
+      : role === "MECHANIC"
+      ? ["MECHANIC"]
+      : ["USER", "MECHANIC"];
+
+  const result = await User.aggregate([
+    {
+      $match: {
+        role: { $in: roleFilter },
+      },
+    },
+    {
+      $lookup: {
+        from: "userprofiles", // collection name (lowercase + plural)
+        localField: "_id",
+        foreignField: "user",
+        as: "userProfile",
+      },
+    },
+    {
+      $lookup: {
+        from: "mechanicprofiles", // collection name (lowercase + plural)
+        localField: "_id",
+        foreignField: "user",
+        as: "mechanicProfile",
+      },
+    },
+    {
+      $addFields: {
+        profile: {
+          $cond: [
+            { $eq: ["$role", "USER"] },
+            { $arrayElemAt: ["$userProfile", 0] },
+            { $arrayElemAt: ["$mechanicProfile", 0] },
+          ],
+        },
+      },
+    },
+    {
+      $project: {
+        password: 0,
+        userProfile: 0,
+        mechanicProfile: 0,
+      },
+    },
+  ]);
+
+  return result;
+};
 
 export const DashboardService = {
   dashboardData,
+  paymentHistory,
+  getUsersByRole,
 };
