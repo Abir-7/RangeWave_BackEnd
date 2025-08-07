@@ -28,6 +28,37 @@ const getProfileData = catchAsync(async (req, res) => {
   });
 });
 
+const getUserDetails = catchAsync(async (req, res) => {
+  const result = await UserService.getProfileData(req.params.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "Profile data fetched successfully.",
+    data: result,
+  });
+});
+
+const deleteMe = catchAsync(async (req, res) => {
+  const result = await UserService.deleteUser(req.user.userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "User data  is deleted successfully",
+    data: result,
+  });
+});
+const deleteUser = catchAsync(async (req, res) => {
+  const result = await UserService.deleteUser(req.params.uId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "User data  is deleted successfully",
+    data: result,
+  });
+});
+
 //   const userData = req.body;
 
 //   const result = await UserService.updateProfileData(
@@ -45,4 +76,7 @@ const getProfileData = catchAsync(async (req, res) => {
 export const UserController = {
   updateProfileImage,
   getProfileData,
+  getUserDetails,
+  deleteMe,
+  deleteUser,
 };

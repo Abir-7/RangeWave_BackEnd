@@ -14,6 +14,7 @@ export interface IBaseUser {
   needToResetPass: boolean;
   needToUpdateProfile: boolean;
   isBlocked: boolean;
+  isDeleted: boolean;
 }
 
 export interface IUser extends IBaseUser, Document {

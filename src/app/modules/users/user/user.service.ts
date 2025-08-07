@@ -138,7 +138,25 @@ const getProfileData = async (userId: string) => {
   return result[0] || null;
 };
 
+const deleteUser = async (userId: string) => {
+  const user = await User.findOneAndUpdate(
+    {
+      _id: userId,
+    },
+    {
+      isDeleted: true,
+    }
+  );
+
+  if (!user) {
+    throw new Error("Faild to delete user");
+  }
+
+  return user;
+};
+
 export const UserService = {
   updateProfileImage,
   getProfileData,
+  deleteUser,
 };

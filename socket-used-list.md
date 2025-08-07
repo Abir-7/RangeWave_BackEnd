@@ -8,19 +8,21 @@ io.emit("new-service", { serviceId: service._id });
   io.emit(`service-${saveBid.reqServiceId}`, { serviceId: saveBid.reqServiceId });
 
 
-// when save payment
-io.emit("new-hire", { paymentId: newPaymentData._id });
-
-
-// when cencel a service
-io.emit("cencel", { serviceId: id }); 
+//hire mechanic
+    io.emit(`hire-${bidData.mechanicId}`, {
+      serviceId: isServiceExist._id,
+      paymentId: payment[0]._id,
+    });
 
 
 // when mechanic change status
-io.emit("service-status", { serviceId: serviceData._id }); 
+
+    io.emit(`service-status-${serviceData.user}`, { paymentId: pId });
 
 
 // when user mark status as complete
-io.emit("markAsComplete", { bidId: bidData._id }); 
+      io.emit(`mark-complete-${paymentData.mechanicId}`, {
+        paymentId: paymentData._id,
+      });
 
 

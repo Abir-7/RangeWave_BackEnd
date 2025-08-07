@@ -360,6 +360,11 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
       await session.commitTransaction();
       session.endSession();
 
+      const io = getSocket();
+      io.emit(`mark-complete-${paymentData.mechanicId}`, {
+        paymentId: paymentData._id,
+      });
+
       return {
         paymentIntent: "",
         message: "Work mark as comleted.",
@@ -658,7 +663,7 @@ const changeServiceStatus = async (
 
     // Notify via socket outside transaction
     const io = getSocket();
-    io.emit("service-status", { paymentId: pId });
+    io.emit(`service-status-${serviceData.user}`, { paymentId: pId });
 
     return newData;
   } catch (err) {

@@ -19,6 +19,7 @@ const userSchema = new Schema<IUser>({
   needToResetPass: { type: Boolean, default: false },
   needToUpdateProfile: { type: Boolean, default: true },
   isBlocked: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
 });
 
 userSchema.methods.comparePassword = async function (enteredPassword: string) {

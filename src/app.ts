@@ -13,6 +13,7 @@ const corsOption = {
   origin: [
     "*",
     "http://10.10.12.62:3000",
+    "http://localhost:5173",
     "https://stripe-front-end.vercel.app",
   ],
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],

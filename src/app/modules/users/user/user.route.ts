@@ -19,4 +19,9 @@ router.get(
   UserController.getProfileData
 );
 
+router.delete("/delete-me", auth("USER"), UserController.deleteMe);
+router.delete("/delete/:uId", auth("ADMIN"), UserController.deleteUser);
+
+router.get("/:userId", auth("ADMIN"), UserController.getProfileData);
+
 export const UserRoute = router;

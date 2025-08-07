@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { userRoles } from "../../interface/auth.interface";
 import { Service } from "../serviceFlow/service/service.model";
@@ -5,63 +6,130 @@ import Payment from "../stripe/payment.model";
 import User from "../users/user/user.model";
 
 const dashboardData = async () => {
-  const months = [
-    "",
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const currentYear = new Date().getFullYear();
+  const startOfYear = new Date(currentYear, 0, 1);
+  const endOfYear = new Date(currentYear + 1, 0, 1);
 
-  const stats = await Service.aggregate([
+  const dayStats = await Service.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startOfYear,
+          $lt: endOfYear,
+        },
+      },
+    },
     {
       $group: {
         _id: {
           year: { $year: "$createdAt" },
           month: { $month: "$createdAt" },
+          day: { $dayOfMonth: "$createdAt" },
         },
-        total: { $sum: 1 },
+        totalService: { $sum: 1 },
       },
     },
-    { $sort: { "_id.year": 1, "_id.month": 1 } },
     {
-      $project: {
-        _id: 0,
-        year: "$_id.year",
-        month: { $arrayElemAt: [months, "$_id.month"] },
-        total: 1,
+      $sort: {
+        "_id.year": 1,
+        "_id.month": 1,
+        "_id.day": 1,
       },
     },
   ]);
+
+  type DailyVisit = {
+    day: number;
+    totalService: number;
+    date: string;
+  };
+
+  type MonthlyData = Record<string, DailyVisit[]>;
+
+  const months = [
+    "",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const monthlyData: MonthlyData = {};
+
+  for (const {
+    _id: { year, month, day },
+    totalService,
+  } of dayStats) {
+    const monthName = months[month];
+    const monthKey = `${monthName} ${year}`;
+    const date = `${monthName} ${day}, ${year}`;
+
+    if (!monthlyData[monthKey]) {
+      monthlyData[monthKey] = [];
+    }
+
+    monthlyData[monthKey].push({ day, totalService, date });
+  }
+
+  // Fill missing days with totalService = 0
+  for (const monthKey in monthlyData) {
+    const [monthName, yearStr] = monthKey.split(" ");
+    const year = Number(yearStr);
+    const monthIndex = months.indexOf(monthName);
+
+    // Get number of days in the month
+    const daysInMonth = new Date(year, monthIndex, 0).getDate();
+
+    // Map existing days for quick lookup
+    const dayMap = new Map(monthlyData[monthKey].map((d) => [d.day, d]));
+
+    const fullDays: DailyVisit[] = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      if (dayMap.has(d)) {
+        fullDays.push(dayMap.get(d)!);
+      } else {
+        fullDays.push({
+          day: d,
+          totalService: 0,
+          date: `${monthName} ${d}, ${year}`,
+        });
+      }
+    }
+
+    monthlyData[monthKey] = fullDays;
+  }
 
   const [totalMechanic, totalUser] = await Promise.all([
     User.countDocuments({
       role: userRoles.MECHANIC,
       isVerified: true,
-
+      isDeleted: false,
       isBlocked: false,
     }),
     User.countDocuments({
       role: userRoles.USER,
       isVerified: true,
+      isDeleted: false,
       isBlocked: false,
     }),
   ]);
 
   return {
-    stats, // For Recharts monthly chart
-    totalMechanic, // For overview count
-    totalUser, // For overview count
+    monthlyData,
+    totalMechanic,
+    totalUser,
   };
 };
+
 const paymentHistory = async () => {
   const history = await Payment.find()
     .populate({ path: "bidId", select: "price status extraWork location" })
@@ -83,7 +151,10 @@ const paymentHistory = async () => {
   return history;
 };
 
-const getUsersByRole = async (role: "USER" | "MECHANIC") => {
+const getUsersByRole = async (
+  role: "USER" | "MECHANIC",
+  searchTerm?: string
+) => {
   const roleFilter =
     role === "USER"
       ? ["USER"]
@@ -91,15 +162,24 @@ const getUsersByRole = async (role: "USER" | "MECHANIC") => {
       ? ["MECHANIC"]
       : ["USER", "MECHANIC"];
 
+  const matchStage: any = {
+    role: { $in: roleFilter },
+    isBlocked: false,
+    isDeleted: false,
+    isVerified: true,
+  };
+
+  if (searchTerm) {
+    matchStage.$or = [
+      { email: { $regex: searchTerm, $options: "i" } }, // match email
+    ];
+  }
+
   const result = await User.aggregate([
-    {
-      $match: {
-        role: { $in: roleFilter },
-      },
-    },
+    { $match: matchStage },
     {
       $lookup: {
-        from: "userprofiles", // collection name (lowercase + plural)
+        from: "userprofiles",
         localField: "_id",
         foreignField: "user",
         as: "userProfile",
@@ -107,7 +187,7 @@ const getUsersByRole = async (role: "USER" | "MECHANIC") => {
     },
     {
       $lookup: {
-        from: "mechanicprofiles", // collection name (lowercase + plural)
+        from: "mechanicprofiles",
         localField: "_id",
         foreignField: "user",
         as: "mechanicProfile",
@@ -124,6 +204,19 @@ const getUsersByRole = async (role: "USER" | "MECHANIC") => {
         },
       },
     },
+    // Optional: Filter by profile.name (after join)
+    ...(searchTerm
+      ? [
+          {
+            $match: {
+              $or: [
+                { email: { $regex: searchTerm, $options: "i" } },
+                { "profile.fullName": { $regex: searchTerm, $options: "i" } },
+              ],
+            },
+          },
+        ]
+      : []),
     {
       $project: {
         password: 0,
