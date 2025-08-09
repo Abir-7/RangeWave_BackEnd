@@ -21,6 +21,7 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 
 import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
+import logger from "../../../utils/logger";
 
 //------------------------for users--------------------------//
 
@@ -361,7 +362,7 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
       session.endSession();
 
       const io = getSocket();
-      io.emit(`mark-complete-${paymentData.mechanicId}`, {
+      io.emit(`progress-${paymentData._id}`, {
         paymentId: paymentData._id,
       });
 
@@ -431,14 +432,13 @@ const cancelService = async (
   userId: string
 ): Promise<IService> => {
   const session = await mongoose.startSession();
-
+  console.log(pId, "ssss", userId);
   try {
     session.startTransaction();
 
     const paymentData = await Payment.findOne({
       _id: pId,
       status: PaymentStatus.UNPAID,
-      user: userId,
     });
 
     if (!paymentData) {
@@ -461,7 +461,7 @@ const cancelService = async (
     await paymentData.save({ session });
 
     const io = getSocket();
-    io.emit(`cencel-${paymentData.mechanicId}`, { paymentId: pId });
+    io.emit(`progress-${paymentData._id}`, { paymentId: pId });
 
     await session.commitTransaction();
     session.endSession();
@@ -634,9 +634,9 @@ const changeServiceStatus = async (
       serviceData.status === Status.WAITING &&
       statusData === Status.WORKING
     ) {
-      if (extraWork.price > 0) {
+      if (extraWork?.price > 0) {
         bidData.extraWork = extraWork;
-        paymentData.extraAmount = extraWork.price;
+        paymentData.extraAmount = extraWork?.price;
       }
 
       serviceData.status = Status.WORKING;
@@ -663,7 +663,7 @@ const changeServiceStatus = async (
 
     // Notify via socket outside transaction
     const io = getSocket();
-    io.emit(`service-status-${serviceData.user}`, { paymentId: pId });
+    io.emit(`progress-${paymentData._id}`, { paymentId: pId });
 
     return newData;
   } catch (err) {
