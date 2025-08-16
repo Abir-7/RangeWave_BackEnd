@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import status from "http-status";
+import AppError from "../../../errors/AppError";
 import ChatRoom from "../room/room.model";
 import Message from "./message.model";
 
@@ -53,6 +55,21 @@ const sendMessage = async (
   }
 };
 
+const getMessage = async (userId: string, roomId: string) => {
+  const rooms = await ChatRoom.find({
+    users: { $in: [userId] },
+    _id: roomId,
+  });
+
+  if (!rooms) {
+    throw new AppError(status.NOT_FOUND, "Chat room not found.");
+  }
+
+  const chatdata = await Message.find({ roomId });
+  return chatdata;
+};
+
 export const MessageService = {
   sendMessage,
+  getMessage,
 };

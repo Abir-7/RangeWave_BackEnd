@@ -28,8 +28,18 @@ const stripeWebhook = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const zoneExclusivePayment = catchAsync(async (req, res) => {
+  const result = await StripeService.zoneExclusivePayment(req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "Webhook response",
+    data: result,
+  });
+});
 
 export const StripeController = {
   createAndConnect,
   stripeWebhook,
+  zoneExclusivePayment,
 };

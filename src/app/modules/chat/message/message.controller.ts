@@ -12,7 +12,20 @@ const sendMessage = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getMessage = catchAsync(async (req: Request, res: Response) => {
+  const result = await MessageService.getMessage(
+    req.user.userId,
+    req.params.roomId
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Message are fetched successfully",
+    data: result,
+  });
+});
 
 export const MessageController = {
   sendMessage,
+  getMessage,
 };

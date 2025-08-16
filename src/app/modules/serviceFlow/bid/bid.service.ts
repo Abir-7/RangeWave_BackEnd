@@ -36,6 +36,13 @@ const addBid = async (
     );
   }
 
+  if (mechaniceProfile.isNeedToPayForWorkShop) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Another mechanics with workshop open account before you near your location. So you have to pay for one time.After pay you can bid."
+    );
+  }
+
   if (!isServiceExist) {
     throw new AppError(status.NOT_FOUND, "Service req not found");
   }

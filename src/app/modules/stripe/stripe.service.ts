@@ -173,6 +173,26 @@ const createPaymentIntent = async (pId: string) => {
   };
 };
 
+const zoneExclusivePayment = async (mechanicId: string) => {
+  try {
+    const totalCost = 10; // USD
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(totalCost * 100), // Stripe expects cents
+      currency: "usd",
+      automatic_payment_methods: { enabled: true },
+      metadata: { mechanicId }, // attach mechanic info
+    });
+
+    return {
+      clientSecret: paymentIntent.client_secret, // send to frontend
+      paymentIntentId: paymentIntent.id,
+    };
+  } catch (error) {
+    logger.error("Stripe PaymentIntent error:", error);
+    throw new Error("Payment initialization failed");
+  }
+};
+
 const stripeWebhook = async (rawBody: Buffer, sig: string) => {
   let event: Stripe.Event;
 
@@ -197,27 +217,41 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const metadata = paymentIntent.metadata;
 
-        const { bidId, serviceId, paymentId } = metadata;
+        const { bidId, serviceId, paymentId, mechanicId } = metadata;
 
-        const serviceData = await Service.findOne({
-          _id: serviceId,
-          bidId,
-        }).session(session);
-        if (!serviceData) {
-          throw new AppError(status.NOT_FOUND, "Service data not found.");
+        if (bidId && serviceId && paymentId) {
+          const serviceData = await Service.findOne({
+            _id: serviceId,
+            bidId,
+          }).session(session);
+          if (!serviceData) {
+            throw new AppError(status.NOT_FOUND, "Service data not found.");
+          }
+
+          serviceData.isServiceCompleted = IsServiceCompleted.YES;
+
+          await Promise.all([
+            Payment.findByIdAndUpdate(paymentId, {
+              status: PaymentStatus.PAID,
+            }).session(session),
+            serviceData.save({ session }),
+          ]);
+
+          await session.commitTransaction();
+          session.endSession();
         }
 
-        serviceData.isServiceCompleted = IsServiceCompleted.YES;
-
-        await Promise.all([
-          Payment.findByIdAndUpdate(paymentId, {
-            status: PaymentStatus.PAID,
-          }).session(session),
-          serviceData.save({ session }),
-        ]);
-
-        await session.commitTransaction();
-        session.endSession();
+        if (mechanicId) {
+          //!
+          const mechanicData = await MechanicProfile.findOne({
+            user: mechanicId,
+          });
+          if (!mechanicData) {
+            throw new AppError(404, "Mechanic data not found.");
+          }
+          mechanicData.isNeedToPayForWorkShop = false;
+          await mechanicData.save();
+        }
       } catch (err) {
         await session.abortTransaction();
         session.endSession();
@@ -233,13 +267,13 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
     }
 
     default:
-      logger.info(`ℹ️ Unhandled event type: ${event.type}`);
+      logger.info(`Unhandled event type: ${event.type}`);
   }
 };
 
 export const StripeService = {
   createAndConnect,
   createPaymentIntent,
-
+  zoneExclusivePayment,
   stripeWebhook,
 };

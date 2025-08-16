@@ -56,6 +56,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     },
     experience: [{ type: String }],
     certificates: [CertificateSchema],
+    isNeedToPayForWorkShop: { type: Boolean, default: false },
   },
   {
     timestamps: true,
@@ -63,7 +64,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
 );
 
 // Add a 2dsphere index to the coordinates field
-MechanicProfileSchema.index({ "location.coordinates": "2dsphere" });
+MechanicProfileSchema.index({ "workshop.location.coordinates": "2dsphere" });
 
 // Create and export the model
 export const MechanicProfile = model("MechanicProfile", MechanicProfileSchema);

@@ -32,6 +32,7 @@ export interface IMechanicProfile {
   workshop: IWorkshop;
   experience: string[];
   certificates: ICertificate[];
+  isNeedToPayForWorkShop: boolean;
 }
 
 export interface IWorkshop {

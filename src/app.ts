@@ -13,6 +13,7 @@ const corsOption = {
   origin: [
     "*",
     "http://10.10.12.62:3000",
+    "http://10.10.12.59:5173",
     "http://localhost:5173",
     "https://stripe-front-end.vercel.app",
   ],
@@ -50,10 +51,39 @@ app.get("/stripe/onboarding/refresh", (req, res) => {
 
 // Onboarding success route
 app.get("/stripe/onboarding/success", (req, res) => {
+  // const deepLink = "rangewave://stripe/onboarding/refresh";
+  // res.redirect(deepLink);
   res.send(`
-    <h1>Onboarding Complete!</h1>
-    <p>Your Stripe account is ready to receive payments.</p>
-    <a href="/dashboard">Go to Dashboard</a>
+    <html>
+      <head>
+        <title>Redirecting...</title>
+        <script type="text/javascript">
+          // Try to open app
+          window.location = "rangewave://stripe/success";
+          // After a timeout, redirect to fallback URL (e.g. web page)
+          setTimeout(() => {
+            window.location = "/stripe/onboarding/success/fallback";
+          }, 2000);
+        </script>
+      </head>
+    </html>
+  `);
+});
+
+// Onboarding success route
+app.get("/stripe/onboarding/success/fallback", (req, res) => {
+  // const deepLink = "rangewave://stripe/onboarding/refresh";
+  // res.redirect(deepLink);
+  res.send(`
+    <html>
+      <head>
+        <title>Redirecting...</title>
+      </head>
+      <body>
+        <p>Redirecting you to the app...</p>
+        <p>If nothing happens, <a href="rangewave://stripe/success">click here</a>.</p>
+      </body>
+    </html>
   `);
 });
 

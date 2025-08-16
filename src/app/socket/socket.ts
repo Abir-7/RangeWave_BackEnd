@@ -3,6 +3,7 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import logger from "../utils/logger";
+import { MessageService } from "../modules/chat/message/message.service";
 
 interface User {
   userId: string; // some unique user identifier from your auth system
@@ -51,11 +52,20 @@ export const initSocket = async (httpServer: HttpServer) => {
       }
     });
 
+    socket.on(
+      "chat-room",
+      async (data: { roomId: string; message: string; userId: string }) => {
+        await MessageService.sendMessage(data.userId, {
+          roomId: data.roomId,
+          message: data.message,
+        });
+        io?.emit(`room-${data.roomId}`, data);
+      }
+    );
+
     socket.on("disconnect", () => {
       logger.info(`Client disconnected: ${socket.id}`);
     });
-
-    // Add more socket event handlers here
   });
 
   return io;

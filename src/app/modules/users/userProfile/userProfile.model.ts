@@ -33,7 +33,7 @@ const userProfileSchema = new Schema<IUserProfile>(
     email: { type: String, unique: true },
     phone: { type: String },
     location: { type: LocationSchema, default: {} },
-    image: { type: String },
+    image: { type: String, default: "" },
     stripeCustomerId: { type: String },
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     carInfo: { type: CarInfoSchema, default: {} },

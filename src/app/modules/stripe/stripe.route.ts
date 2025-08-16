@@ -9,5 +9,10 @@ router.post(
   auth("MECHANIC"),
   StripeController.createAndConnect
 );
+router.get(
+  "/zone-exclusive",
+  auth("MECHANIC"),
+  StripeController.zoneExclusivePayment
+);
 
 export const StripeRoute = router;

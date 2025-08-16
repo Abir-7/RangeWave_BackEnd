@@ -28,14 +28,13 @@ export const auth =
           new AppError(status.UNAUTHORIZED, "You are not authorized")
         );
       }
-      logger.info("token given");
-      console.log(token);
+      // logger.info("token given");
+
       const decodedData = jsonWebToken.verifyJwt(
         token.trim(),
         appConfig.jwt.jwt_access_secret as string
       );
 
-      console.log(decodedData);
       logger.info(`token decoded.${decodedData.userId}`);
       const userData = await User.findById({ _id: decodedData.userId });
 
@@ -44,20 +43,20 @@ export const auth =
           new AppError(status.UNAUTHORIZED, "You are not authorized")
         );
       }
-      logger.info("user data found");
+      //logger.info("user data found");
 
       if (!userData.isVerified) {
         return next(
           new AppError(status.UNAUTHORIZED, "You are not authorized")
         );
       }
-      logger.info("user is verified");
+      //logger.info("user is verified");
       if (userRole.length && !userRole.includes(decodedData.userRole)) {
         return next(
           new AppError(status.UNAUTHORIZED, "You are not authorized")
         );
       }
-      logger.info("role included");
+      // logger.info("role included");
       if (
         userData.role !== decodedData.userRole ||
         userData.email !== decodedData.userEmail

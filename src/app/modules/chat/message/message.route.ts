@@ -8,4 +8,11 @@ router.post(
   auth("USER", "MECHANIC"),
   MessageController.sendMessage
 );
+
+router.get(
+  "/get-message/:roomId",
+  auth("USER", "MECHANIC"),
+
+  MessageController.getMessage
+);
 export const MessageRoute = router;
