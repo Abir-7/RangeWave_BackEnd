@@ -554,6 +554,25 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
         as: "profileData",
       },
     },
+
+    //rating - section ---new add...if error just remove this
+
+    {
+      $lookup: {
+        from: "userratings",
+        let: { userId: { $arrayElemAt: ["$profileData.user", 0] } },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$mechanicId", "$$userId"] },
+            },
+          },
+        ],
+        as: "userRatings",
+      },
+    },
+    //-------------------------
+
     {
       $addFields: {
         isBidDone: {
@@ -574,13 +593,17 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
           placeId: "$location.placeId",
           coordinates: "$location.coordinates.coordinates",
         },
+        //---------------------rating-------------
+        avgRating: { $ifNull: [{ $avg: "$userRatings.rating" }, 0] },
       },
+      //----------------------------------
     },
     {
       $project: {
         "profileData.carInfo": 0,
         "profileData.location": 0,
         bids: 0,
+        userRatings: 0,
       },
     },
   ];

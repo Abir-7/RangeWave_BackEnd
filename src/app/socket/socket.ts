@@ -63,6 +63,18 @@ export const initSocket = async (httpServer: HttpServer) => {
       }
     );
 
+    socket.on(
+      "live-location",
+      async (data: {
+        paymentId: string;
+        coordinates: [number, number];
+        userType: "mechanic" | "user";
+      }) => {
+        logger.info(data);
+        io?.emit(`location-${data.paymentId}`, data.coordinates);
+      }
+    );
+
     socket.on("disconnect", () => {
       logger.info(`Client disconnected: ${socket.id}`);
     });
