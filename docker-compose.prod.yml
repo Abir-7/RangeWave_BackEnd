@@ -1,10 +1,8 @@
-version: '3.8'
 
 services:
-
   range-wave-rabbitmq:
     image: rabbitmq:3-management
-    container_name: range-wave-rabbitmq
+    container_name: rabbitmq-range
     ports:
       - "5676:5672"
       - "15676:15672"
@@ -15,11 +13,13 @@ services:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   express-range-wave:
-    build: .
-    container_name: range-wave-express-app
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: express-app-prod
     ports:
       - "4001:4001"
     env_file:
@@ -27,7 +27,3 @@ services:
     depends_on:
       range-wave-rabbitmq:
         condition: service_healthy
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev

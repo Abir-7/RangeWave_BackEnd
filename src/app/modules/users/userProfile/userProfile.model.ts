@@ -35,7 +35,12 @@ const userProfileSchema = new Schema<IUserProfile>(
     location: { type: LocationSchema, default: {} },
     image: { type: String, default: "" },
     stripeCustomerId: { type: String },
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+    },
     carInfo: { type: CarInfoSchema, default: {} },
   },
   { timestamps: true }

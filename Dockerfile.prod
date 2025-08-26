@@ -1,0 +1,26 @@
+# Dockerfile.prod
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies and build
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Production image
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy only production dependencies and build
+COPY package*.json ./
+COPY --from=builder /app/dist ./dist
+RUN npm install --only=production
+
+# Expose port
+EXPOSE 4001
+
+# Start compiled app
+CMD ["node", "dist/server.js"]

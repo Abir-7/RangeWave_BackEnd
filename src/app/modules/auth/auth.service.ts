@@ -64,7 +64,7 @@ const createUser = async (
     const userData = {
       email: data.email,
       password: hashedPassword,
-      authentication: { otp: 1111, expDate },
+      authentication: { otp: otp, expDate },
     };
 
     // Create user
@@ -127,92 +127,80 @@ const userLogin = async (loginData: {
   password: string;
 }): Promise<{
   accessToken: string;
-  userData: any;
   refreshToken: string;
   decodedData: object;
+  userData: any;
 }> => {
-  const userData = await User.findOne({ email: loginData.email }).select(
+  // 1. Find user
+  const user = await User.findOne({ email: loginData.email }).select(
     "+password"
   );
-  if (!userData) {
-    throw new AppError(status.NOT_FOUND, "User not found");
-  }
+  if (!user) throw new AppError(status.NOT_FOUND, "User not found");
 
-  if (userData.isVerified === false) {
+  // 2. Check verification
+  if (!user.isVerified)
     throw new AppError(status.BAD_REQUEST, "Please verify your email.");
-  }
 
-  const isPassMatch = await userData.comparePassword(loginData.password);
-
-  if (!isPassMatch) {
+  // 3. Check password
+  const isPassMatch = await user.comparePassword(loginData.password);
+  if (!isPassMatch)
     throw new AppError(status.BAD_REQUEST, "Please check your password.");
-  }
 
+  // 4. Check profile completeness (only for USER / MECHANIC)
   let isInfoGiven = false;
-
-  if (userData.role === "USER") {
-    const userProfileData = await UserProfile.findOne({
-      user: userData._id,
-    });
-
-    if (!userProfileData) {
+  if (user.role === "USER") {
+    const profile = await UserProfile.findOne({ user: user._id });
+    if (!profile)
       throw new AppError(status.NOT_FOUND, "User profile not found");
-    }
 
-    if (userProfileData.carInfo.carName && userProfileData.carInfo.carModel) {
-      isInfoGiven = true;
-    }
+    isInfoGiven = Boolean(
+      profile?.carInfo?.carName && profile?.carInfo?.carModel
+    );
+  } else if (user.role === "MECHANIC") {
+    const profile = await MechanicProfile.findOne({ user: user._id });
+    if (!profile)
+      throw new AppError(status.NOT_FOUND, "User profile not found");
+
+    isInfoGiven = Boolean(
+      profile?.workshop?.name && profile?.workshop?.services?.length
+    );
   }
 
-  if (userData.role === "MECHANIC") {
-    const mechanicProfileData = await MechanicProfile.findOne({
-      user: userData._id,
-    });
-
-    if (!mechanicProfileData) {
-      throw new AppError(status.NOT_FOUND, "User profile not found");
-    }
-
-    if (
-      mechanicProfileData.workshop.name &&
-      mechanicProfileData.workshop.services
-    ) {
-      isInfoGiven = true;
-    }
-  }
-
+  // 5. Prepare JWT payload
   const jwtPayload = {
-    userEmail: userData.email,
-    userId: userData._id,
-    userRole: userData.role,
+    userEmail: user.email,
+    userId: user._id,
+    userRole: user.role,
   };
 
+  // 6. Generate tokens
   const accessToken = jsonWebToken.generateToken(
     jwtPayload,
-    appConfig.jwt.jwt_access_secret as string,
+    appConfig.jwt.jwt_access_secret!,
     appConfig.jwt.jwt_access_exprire
   );
 
   const refreshToken = jsonWebToken.generateToken(
     jwtPayload,
-    appConfig.jwt.jwt_refresh_secret as string,
+    appConfig.jwt.jwt_refresh_secret!,
     appConfig.jwt.jwt_refresh_exprire
   );
 
-  const decodedData = jwtDecode(accessToken);
+  const decodedData: any = jwtDecode(accessToken);
 
+  // 7. Return safe response
   return {
     accessToken,
+    refreshToken,
     decodedData: {
       ...decodedData,
       iat: (decodedData.iat ?? 0) * 1000,
       exp: (decodedData.exp ?? 0) * 1000,
     },
-    refreshToken,
     userData: {
-      ...userData.toObject(),
-      password: null,
-      ...(userData.role !== "ADMIN" ? { isInfoGiven } : {}),
+      ...user.toObject(),
+      password: undefined, // safer than null
+      ...(user.role !== "ADMIN" ? { isInfoGiven } : {}),
     },
   };
 };
@@ -304,7 +292,7 @@ const forgotPasswordRequest = async (
   const expDate = getExpiryTime(10);
 
   const data = {
-    otp: "1111",
+    otp: otp,
     expDate: expDate,
     needToResetPass: false,
     token: null,

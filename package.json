@@ -7,7 +7,12 @@
     "build": "npx tsc",
     "start": "node ./dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only --poll ./src/server.ts",
-    "docker:up": "docker-compose up --build"
+    "docker:up": "docker-compose up --build",
+      "docker:up:dev": "docker-compose -f docker-compose.dev.yml up --build",
+  "docker:down:dev": "docker-compose -f docker-compose.dev.yml down",
+
+  "docker:up:prod": "docker-compose -f docker-compose.prod.yml up --build",
+  "docker:down:prod": "docker-compose -f docker-compose.prod.yml down"
   },
   "keywords": [],
   "author": "",
