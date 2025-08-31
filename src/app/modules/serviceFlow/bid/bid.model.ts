@@ -17,18 +17,20 @@ const bidSchema = new Schema(
       price: { type: Number, default: 0 },
     },
     location: {
-      placeId: { type: String, required: true },
-      coordinates: {
-        type: {
-          type: String,
-          enum: ["Point"],
-          default: "Point",
-        },
+      type: {
+        placeId: { type: String },
         coordinates: {
-          type: [Number], // [longitude, latitude]
-          required: true,
+          type: {
+            type: String,
+            enum: ["Point"],
+            default: "Point",
+          },
+          coordinates: {
+            type: [Number],
+          },
         },
       },
+      default: null, // <-- makes the whole location optional
     },
   },
   {

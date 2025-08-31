@@ -16,6 +16,7 @@ const corsOption = {
     "http://10.10.12.59:5173",
     "http://localhost:5173",
     "https://stripe-front-end.vercel.app",
+    "https://wange-wave.vercel.app",
   ],
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
