@@ -615,6 +615,7 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
       mechanicCoordinate,
       service.location.coordinates
     );
+
     return {
       ...service,
       distanceKm: distance,

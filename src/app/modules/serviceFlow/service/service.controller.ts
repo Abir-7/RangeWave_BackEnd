@@ -115,9 +115,11 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
 
 const getAllRequestedService = catchAsync(
   async (req: Request, res: Response) => {
+    console.time();
     const result = await ServiceService.getAllRequestedService(
       req.body.coordinate
     );
+    console.timeEnd();
     sendResponse(res, {
       success: true,
       statusCode: 200,
