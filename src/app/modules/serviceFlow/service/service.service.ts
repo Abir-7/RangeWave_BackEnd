@@ -361,7 +361,9 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
       await session.commitTransaction();
       session.endSession();
 
+      //-----------------------------------socket------------------
       const io = getSocket();
+
       io.emit(`progress-${paymentData._id}`, {
         paymentId: paymentData._id,
       });
@@ -377,7 +379,7 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
       throw error;
     }
   }
-
+  //----------------------------------------------------
   if (paymentType === PaymentType.ONLINE) {
     const result = await StripeService.createPaymentIntent(pId);
     return {

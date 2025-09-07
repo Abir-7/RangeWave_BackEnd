@@ -19,6 +19,7 @@ import { UserProfile } from "../users/userProfile/userProfile.model";
 import { Service } from "../serviceFlow/service/service.model";
 import { IsServiceCompleted } from "../serviceFlow/service/service.interface";
 import mongoose from "mongoose";
+import { getSocket } from "../../socket/socket";
 
 const createAndConnect = async (mechanicEmail: string) => {
   if (!mechanicEmail || !mechanicEmail.includes("@")) {
@@ -252,6 +253,11 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
           mechanicData.isNeedToPayForWorkShop = false;
           await mechanicData.save();
         }
+        //--------------------------------- socket need----------------------------
+        const io = getSocket();
+        io.emit(`progress-${paymentId}`, {
+          paymentId: paymentId,
+        });
       } catch (err) {
         await session.abortTransaction();
         session.endSession();
