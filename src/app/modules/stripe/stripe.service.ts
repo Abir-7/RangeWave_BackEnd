@@ -67,9 +67,18 @@ const createAndConnect = async (mechanicEmail: string) => {
     collect: "eventually_due", // optional: ensures missing info is collected
   });
 
+  const account = await stripe.accounts.retrieve(stripeAccountId);
+  let isAccountActive = false;
+  if (!account.charges_enabled || !account.payouts_enabled) {
+    isAccountActive = false;
+  } else {
+    isAccountActive = true;
+  }
+
   return {
     url: accountLink.url,
     accountId: stripeAccountId,
+    isAccountActive,
   };
 };
 

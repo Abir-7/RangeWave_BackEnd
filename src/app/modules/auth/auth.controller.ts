@@ -9,8 +9,10 @@ import { TUserRole } from "../../interface/auth.interface";
 
 const createUser = catchAsync(async (req, res) => {
   const { role, ...other } = req.body;
+  console.time();
   const result = await AuthService.createUser(other, role as TUserRole);
-
+  console.timeEnd();
+  logger.info("gg");
   sendResponse(res, {
     success: true,
     statusCode: status.OK,
@@ -20,7 +22,9 @@ const createUser = catchAsync(async (req, res) => {
 });
 
 const userLogin = catchAsync(async (req, res, next) => {
+  console.time();
   const result = await AuthService.userLogin(req.body);
+  console.timeEnd();
 
   res.cookie("refreshToken", `Bearer ${result.refreshToken}`, {
     secure: appConfig.server.node_env === "production",

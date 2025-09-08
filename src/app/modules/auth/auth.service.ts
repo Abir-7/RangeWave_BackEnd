@@ -85,24 +85,11 @@ const createUser = async (
       await MechanicProfile.create([userProfileData], { session });
     }
 
-    // Send email verification
-    // await sendEmail(
-    //   data.email,
-    //   "Email Verification Code",
-    //   `Your code is: ${otp}`
-    // );
-
     await publishJob("emailQueue", {
       to: data.email,
       subject: "Email Verification Code",
       body: otp.toString(),
     });
-
-    // await emailQueue.add("send-verification-email", {
-    //   email: data.email,
-    //   subject: "Email Verification Code",
-    //   text: `Your code is: ${otp}`,
-    // });
 
     // Commit the transaction
     await session.commitTransaction();

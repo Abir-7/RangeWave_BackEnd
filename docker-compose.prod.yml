@@ -4,8 +4,8 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq-range
     ports:
-      - "5676:5672"
-      - "15676:15672"
+      - "5679:5672"
+      - "15679:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
