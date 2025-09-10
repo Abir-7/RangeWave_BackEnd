@@ -21,7 +21,6 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 
 import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
-import logger from "../../../utils/logger";
 
 //------------------------for users--------------------------//
 
