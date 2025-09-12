@@ -4,6 +4,8 @@ import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import logger from "../utils/logger";
 import { MessageService } from "../modules/chat/message/message.service";
+import Payment from "../modules/stripe/payment.model";
+import { Status } from "../modules/serviceFlow/service/service.interface";
 
 interface User {
   userId: string; // some unique user identifier from your auth system
@@ -72,6 +74,32 @@ export const initSocket = async (httpServer: HttpServer) => {
       }) => {
         logger.info(data);
         io?.emit(`location-${data.paymentId}`, data.coordinates);
+      }
+    );
+
+    socket.on(
+      "working-status",
+      async (data: { paymentId: string; status: Status }) => {
+        const statusMessages: Record<Status, string> = {
+          [Status.FINDING]: "Service is being searched...",
+          [Status.WAITING]: "Service is waiting for approval...",
+          [Status.WORKING]: "Service is in progress...",
+          [Status.COMPLETED]: "Service has been completed.",
+          [Status.CANCELLED]: "Service was cancelled.",
+        };
+
+        const paymentData = await Payment.findById(data.paymentId);
+
+        if (!paymentData) return;
+
+        const socketData = {
+          ...data,
+          message:
+            statusMessages[data.status] ||
+            `Service status changed to ${data.status}`,
+        };
+
+        io?.emit(`user-${paymentData.user}`, socketData);
       }
     );
 
