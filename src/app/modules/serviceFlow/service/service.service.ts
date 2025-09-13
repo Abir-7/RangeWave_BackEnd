@@ -21,6 +21,7 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 
 import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
+import { TUserRole } from "../../../interface/auth.interface";
 
 //------------------------for users--------------------------//
 
@@ -315,6 +316,11 @@ const hireMechanic = async (data: { bidId: string }, userId: string) => {
       paymentId: payment[0]._id,
     });
 
+    io?.emit(`user-${bidData.mechanicId}`, {
+      message: "You have been hired.",
+      paymentId: payment[0]._id,
+    });
+
     return payment[0]; // create returns an array
   } catch (err: any) {
     await session.abortTransaction();
@@ -365,6 +371,11 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
 
       io.emit(`progress-${paymentData._id}`, {
         paymentId: paymentData._id,
+      });
+
+      io?.emit(`user-${paymentData.mechanicId}`, {
+        message: "Customer mark service as done.",
+        paymentId: pId,
       });
 
       return {
@@ -430,7 +441,8 @@ const getRunningService = async (userId: string) => {
 const cancelService = async (
   pId: string,
   serviceData: { cancelReson: string },
-  userId: string
+  userId: string,
+  userRole: TUserRole
 ): Promise<IService> => {
   const session = await mongoose.startSession();
   console.log(pId, "ssss", userId);
@@ -461,8 +473,20 @@ const cancelService = async (
     paymentData.status = PaymentStatus.CANCELLED;
     await paymentData.save({ session });
 
+    const isMechanic = userRole === "MECHANIC";
+
     const io = getSocket();
+
     io.emit(`progress-${paymentData._id}`, { paymentId: pId });
+
+    io?.emit(`user-${isMechanic ? paymentData.user : paymentData.mechanicId}`, {
+      message: `${
+        isMechanic
+          ? "Mechanic cencel your service"
+          : "Customer cencel his service"
+      }`,
+      paymentId: pId,
+    });
 
     await session.commitTransaction();
     session.endSession();
@@ -686,9 +710,23 @@ const changeServiceStatus = async (
     await session.commitTransaction();
     session.endSession();
 
+    const statusMessages: Record<Status, string> = {
+      [Status.FINDING]: "Service is being searched...",
+      [Status.WAITING]: "Service is waiting for approval...",
+      [Status.WORKING]: "Service is in progress...",
+      [Status.COMPLETED]: "Service has been completed.",
+      [Status.CANCELLED]: "Service was cancelled.",
+    };
+
     // Notify via socket outside transaction
     const io = getSocket();
     io.emit(`progress-${paymentData._id}`, { paymentId: pId });
+
+    io?.emit(`user-${paymentData.user}`, {
+      message:
+        statusMessages[statusData] || `Service status changed to ${statusData}`,
+      paymentId: pId,
+    });
 
     return newData;
   } catch (err) {

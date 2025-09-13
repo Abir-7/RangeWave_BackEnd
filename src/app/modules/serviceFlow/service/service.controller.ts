@@ -102,7 +102,8 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
   const result = await ServiceService.cancelService(
     pId,
     serviceData,
-    req.user.userId
+    req.user.userId,
+    req.user.userRole
   );
   sendResponse(res, {
     success: true,

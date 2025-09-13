@@ -267,6 +267,10 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
         io.emit(`progress-${paymentId}`, {
           paymentId: paymentId,
         });
+        io?.emit(`user-${mechanicId}`, {
+          message: "Customer mark service as done.",
+          paymentId: paymentId,
+        });
       } catch (err) {
         await session.abortTransaction();
         session.endSession();
