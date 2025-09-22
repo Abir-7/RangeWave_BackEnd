@@ -113,6 +113,7 @@ const createUser = async (
 const userLogin = async (loginData: {
   email: string;
   password: string;
+  role: TUserRole;
 }): Promise<{
   accessToken: string;
   refreshToken: string;
@@ -120,10 +121,15 @@ const userLogin = async (loginData: {
   userData: any;
 }> => {
   // 1. Find user
+
   const user = await User.findOne({
     email: loginData.email.toLowerCase(),
   }).select("+password");
   if (!user) throw new AppError(status.NOT_FOUND, "User not found");
+
+  if (user.role !== loginData.role) {
+    throw new AppError(500, `You can't login as ${loginData.role} `);
+  }
 
   // 2. Check verification
   if (!user.isVerified)
