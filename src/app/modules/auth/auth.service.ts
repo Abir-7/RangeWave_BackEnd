@@ -8,7 +8,7 @@ import { jsonWebToken } from "../../utils/jwt/jwt";
 
 import getExpiryTime from "../../utils/helper/getExpiryTime";
 import getOtp from "../../utils/helper/getOtp";
-import { sendEmail } from "../../utils/sendEmail";
+
 import getHashedPassword from "../../utils/helper/getHashedPassword";
 import { appConfig } from "../../config";
 import { jwtDecode } from "jwt-decode";
@@ -572,7 +572,7 @@ const reSendOtp = async (userEmail: string) => {
     body: OTP.toString(),
   });
 
-  await sendEmail(userEmail, "Verification Code", `CODE: ${OTP}`);
+  // await sendEmail(userEmail, "Verification Code", `CODE: ${OTP}`);
   return { message: "Verification code send." };
 };
 export const AuthService = {
