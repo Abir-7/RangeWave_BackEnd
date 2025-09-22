@@ -549,7 +549,7 @@ const reSendOtp = async (userEmail: string) => {
   }
 
   const updateUser = await User.findOneAndUpdate(
-    { email: userEmail },
+    { email: userEmail.toLowerCase() },
     {
       $set: {
         "authentication.otp": OTP,
@@ -564,7 +564,7 @@ const reSendOtp = async (userEmail: string) => {
   }
 
   await publishJob("emailQueue", {
-    to: userEmail,
+    to: userEmail.toLowerCase(),
     subject: "Verification Code",
     body: OTP.toString(),
   });
