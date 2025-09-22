@@ -34,7 +34,7 @@ const createUser = async (
     throw new AppError(status.BAD_REQUEST, "User role is required.");
   }
   let isExist: any;
-  isExist = await User.findOne({ email: data.email });
+  isExist = await User.findOne({ email: data.email.toLowerCase() });
 
   if (isExist?.isVerified === false) {
     await User.findOneAndDelete({ email: isExist.email });
@@ -63,16 +63,13 @@ const createUser = async (
 
     // User data
     const userData = {
-      email: data.email,
+      email: data.email.toLowerCase(),
       password: hashedPassword,
       authentication: { otp: otp, expDate },
     };
 
     // Create user
-    const createdUser = await User.create(
-      [{ ...userData, role, email: userData.email.toLowerCase() }],
-      { session }
-    );
+    const createdUser = await User.create([{ ...userData, role }], { session });
 
     // User profile data
     const userProfileData = {
