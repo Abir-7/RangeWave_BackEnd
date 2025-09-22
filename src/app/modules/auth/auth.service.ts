@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 import AppError from "../../errors/AppError";
@@ -68,7 +69,10 @@ const createUser = async (
     };
 
     // Create user
-    const createdUser = await User.create([{ ...userData, role }], { session });
+    const createdUser = await User.create(
+      [{ ...userData, role, email: userData.email.toLowerCase() }],
+      { session }
+    );
 
     // User profile data
     const userProfileData = {
@@ -119,9 +123,9 @@ const userLogin = async (loginData: {
   userData: any;
 }> => {
   // 1. Find user
-  const user = await User.findOne({ email: loginData.email }).select(
-    "+password"
-  );
+  const user = await User.findOne({
+    email: loginData.email.toLowerCase(),
+  }).select("+password");
   if (!user) throw new AppError(status.NOT_FOUND, "User not found");
 
   // 2. Check verification
@@ -209,7 +213,7 @@ const verifyUser = async (
   if (!otp) {
     throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
   }
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
     throw new AppError(status.BAD_REQUEST, "User not found");
@@ -270,7 +274,7 @@ const verifyUser = async (
 const forgotPasswordRequest = async (
   email: string
 ): Promise<{ email: string }> => {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
     throw new AppError(status.BAD_REQUEST, "Email not found.");
   }
@@ -319,7 +323,7 @@ const verifyUserResetPass = async (
       "Provide the otp. Check your email."
     );
   }
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: email.toLowerCase() });
 
   if (!user) {
     throw new AppError(status.BAD_REQUEST, "User not found");
@@ -524,7 +528,7 @@ const updatePassword = async (
 const reSendOtp = async (userEmail: string) => {
   const OTP = getOtp(4);
 
-  const userData = await User.findOne({ email: userEmail });
+  const userData = await User.findOne({ email: userEmail.toLowerCase() });
 
   if (!userData?.authentication.otp) {
     throw new AppError(
@@ -561,6 +565,12 @@ const reSendOtp = async (userEmail: string) => {
   if (!updateUser) {
     throw new AppError(500, "Failed to Send. Try Again!");
   }
+
+  await publishJob("emailQueue", {
+    to: userEmail,
+    subject: "Verification Code",
+    body: OTP.toString(),
+  });
 
   await sendEmail(userEmail, "Verification Code", `CODE: ${OTP}`);
   return { message: "Verification code send." };
