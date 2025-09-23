@@ -1,3 +1,4 @@
+import { userRole } from "./../../interface/auth.interface";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
@@ -128,7 +129,14 @@ const userLogin = async (loginData: {
   if (!user) throw new AppError(status.NOT_FOUND, "User not found");
 
   if (user.role !== loginData.role) {
-    throw new AppError(500, `You can't login as ${loginData.role} `);
+    throw new AppError(
+      500,
+      `${
+        loginData.role === "USER"
+          ? "This account is registered as a mechanic and can't login as a customer"
+          : "This account is registered as a customer  and can't login as a mechanic"
+      }`
+    );
   }
 
   // 2. Check verification
