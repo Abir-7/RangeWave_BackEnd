@@ -163,7 +163,7 @@ const bidHistory = async (mechanicId: string) => {
         as: "bid",
       },
     },
-    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: true } },
+    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } }, // <- only keep services where bid exists
 
     // 2. Lookup payments for this service
     {
@@ -213,7 +213,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "accepted",
               },
-              // rejected: payments exist but not for this bid
+              // rejected: payments exist for service but not for this bid
               {
                 case: {
                   $and: [
@@ -249,7 +249,7 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
 
-    // 5. Project only required fields (no $project mix errors)
+    // 5. Project only required fields
     {
       $project: {
         _id: 1,
