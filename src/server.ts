@@ -36,7 +36,7 @@ const main = async () => {
   await initSocket(server);
   server.listen(
     Number(appConfig.server.port),
-    appConfig.server.ip as string,
+    //  appConfig.server.ip as string,
     () => {
       logger.info(
         `Example app listening on port ${appConfig.server.port} & ip:${

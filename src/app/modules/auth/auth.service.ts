@@ -1,4 +1,3 @@
-import { userRole } from "./../../interface/auth.interface";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
@@ -222,7 +221,10 @@ const verifyUser = async (
   logger.info("hit--2--");
 
   if (!otp) {
-    throw new AppError(status.BAD_REQUEST, "Give the Code. Check your email.");
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Please provide the code. Check your email."
+    );
   }
   const user = await User.findOne({ email: email.toLowerCase() });
 
@@ -331,7 +333,7 @@ const verifyUserResetPass = async (
   if (!otp) {
     throw new AppError(
       status.BAD_REQUEST,
-      "Provide the otp. Check your email."
+      "Please Provide the otp. Check your email."
     );
   }
   const user = await User.findOne({ email: email.toLowerCase() });
@@ -542,25 +544,15 @@ const reSendOtp = async (userEmail: string) => {
   const userData = await User.findOne({ email: userEmail.toLowerCase() });
 
   if (!userData?.authentication.otp) {
-    throw new AppError(
-      500,
-      "hmm....why do u click resend code? you don't have code"
-    );
+    throw new AppError(500, "No previous code found. Can't send new code.");
   }
 
-  const currentDate = new Date();
-  const expirationDate = new Date(userData.authentication.expDate);
+  // const currentDate = new Date();
+  // const expirationDate = new Date(userData.authentication.expDate);
 
-  if (currentDate < expirationDate) {
-    throw new AppError(status.BAD_REQUEST, "Use previous code.");
-  }
-
-  if (!userData?.authentication.otp) {
-    throw new AppError(
-      500,
-      "hmm....why do u click resend code? you don't have code"
-    );
-  }
+  // if (currentDate < expirationDate) {
+  //   throw new AppError(status.BAD_REQUEST, "Use previous code.");
+  // }
 
   const updateUser = await User.findOneAndUpdate(
     { email: userEmail.toLowerCase() },
