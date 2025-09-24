@@ -142,7 +142,7 @@ const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
 
   const data = await Service.aggregate([
-    // Lookup mechanic's bid for this service (exclude declined)
+    // 1. Lookup bid by this mechanic for this service, exclude declined bids
     {
       $lookup: {
         from: "bids",
@@ -154,7 +154,7 @@ const bidHistory = async (mechanicId: string) => {
                 $and: [
                   { $eq: ["$reqServiceId", "$$serviceId"] },
                   { $eq: ["$mechanicId", mechanicObjectId] },
-                  { $ne: ["$status", "declined"] },
+                  { $ne: ["$status", "declined"] }, // exclude declined bids
                 ],
               },
             },
@@ -164,9 +164,11 @@ const bidHistory = async (mechanicId: string) => {
         as: "bid",
       },
     },
+
+    // 2. Only keep services where this mechanic has a bid (not declined)
     { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } },
 
-    // Lookup payments for this service
+    // 3. Lookup payments for this service
     {
       $lookup: {
         from: "payments",
@@ -176,7 +178,7 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
 
-    // Lookup user profile of the service creator
+    // 4. Lookup user profile (service creator)
     {
       $lookup: {
         from: "userprofiles",
@@ -187,12 +189,13 @@ const bidHistory = async (mechanicId: string) => {
     },
     { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
 
-    // Compute bidStatus
+    // 5. Compute bidStatus
     {
       $addFields: {
         bidStatus: {
           $switch: {
             branches: [
+              // accepted: payment exists for this bid
               {
                 case: {
                   $and: [
@@ -213,6 +216,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "accepted",
               },
+              // rejected: payment exists for this service but not for this bid
               {
                 case: {
                   $and: [
@@ -236,6 +240,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "rejected",
               },
+              // pending: no payment for this service
               {
                 case: { $eq: ["$payments", []] },
                 then: "pending",
@@ -244,30 +249,16 @@ const bidHistory = async (mechanicId: string) => {
             default: "pending",
           },
         },
-        mechanicPrice: "$bid.price",
       },
     },
 
-    // Project only needed fields
+    // 6. Project only required fields
     {
       $project: {
-        _id: 0, // remove the root _id
+        _id: 1,
+        service: "$$ROOT",
+        user: "$userProfile",
         bidStatus: 1,
-        mechanicPrice: 1,
-        service: {
-          _id: 1,
-          issue: 1,
-          description: 1,
-          user: 1,
-          status: 1,
-          isServiceCompleted: 1,
-          location: 1,
-          bidId: 1,
-          schedule: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          userProfile: 1,
-        },
       },
     },
   ]);
