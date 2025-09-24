@@ -745,7 +745,7 @@ const getAllRequestedService = async (
       $match: {
         $or: [
           { mechanicBid: { $exists: false } },
-          { "mechanicBid.status": "provided" },
+          // { "mechanicBid.status": "provided" },
         ],
       },
     },
