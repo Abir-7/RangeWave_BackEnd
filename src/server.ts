@@ -7,6 +7,7 @@ import seedAdmin from "./app/DB";
 import logger from "./app/utils/logger";
 import { initSocket } from "./app/socket/socket";
 import { startConsumers } from "./app/rabbitMq/worker";
+import { seedCars } from "./app/modules/carModel/seedCar";
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught exception:", err);
@@ -33,6 +34,7 @@ const main = async () => {
   logger.info("MongoDB connected");
   await seedAdmin();
   startConsumers();
+  await seedCars();
   await initSocket(server);
   server.listen(
     Number(appConfig.server.port),

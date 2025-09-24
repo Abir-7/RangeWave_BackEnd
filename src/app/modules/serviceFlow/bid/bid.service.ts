@@ -11,6 +11,7 @@ import { getSocket } from "../../../socket/socket";
 import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 import { Bid } from "./bid.model";
+import mongoose from "mongoose";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -137,7 +138,115 @@ const declinedBid = async (
   return service;
 };
 
+const bidHistory = async (mechanicId: string) => {
+  const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
+
+  const bids = await Bid.aggregate([
+    // Filter bids for this mechanic
+    { $match: { mechanicId: mechanicObjectId } },
+
+    // Exclude declined bids
+    { $match: { status: { $ne: "declined" } } },
+
+    // Lookup corresponding payments
+    {
+      $lookup: {
+        from: "payments",
+        let: { bidId: "$_id", serviceId: "$reqServiceId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$serviceId", "$$serviceId"] },
+                  { $eq: ["$mechanicId", mechanicObjectId] },
+                ],
+              },
+            },
+          },
+        ],
+        as: "payments",
+      },
+    },
+
+    // Lookup the service for this bid
+    {
+      $lookup: {
+        from: "services",
+        localField: "reqServiceId",
+        foreignField: "_id",
+        as: "service",
+      },
+    },
+    { $unwind: "$service" },
+
+    // Lookup user profile of the service requester
+    {
+      $lookup: {
+        from: "userprofiles",
+        localField: "service.user",
+        foreignField: "user",
+        as: "userProfile",
+      },
+    },
+    { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
+
+    // Add customerStatus based on payments
+    {
+      $addFields: {
+        customerStatus: {
+          $cond: [
+            { $eq: [{ $size: "$payments" }, 0] },
+            "pending",
+            {
+              $cond: [
+                {
+                  $anyElementTrue: {
+                    $map: {
+                      input: "$payments",
+                      as: "p",
+                      in: { $eq: ["$$p.bidId", "$_id"] },
+                    },
+                  },
+                },
+                "accepted",
+                "rejected",
+              ],
+            },
+          ],
+        },
+      },
+    },
+
+    // Sort latest bids first
+    { $sort: { createdAt: -1 } },
+  ]);
+
+  const formattedBids = bids.map((bid) => ({
+    _id: bid._id,
+    price: bid.price,
+    reqServiceId: bid.reqServiceId,
+    mechanicId: bid.mechanicId,
+    status: bid.status,
+    customerStatus: bid.customerStatus,
+    service: {
+      _id: bid.service._id,
+      issue: bid.service.issue,
+      description: bid.service.description,
+    },
+    userProfile: {
+      _id: bid.userProfile?._id || null,
+      fullName: bid.userProfile?.fullName || "",
+      email: bid.userProfile?.email || "",
+      image: bid.userProfile?.image || "",
+    },
+  }));
+
+  return formattedBids;
+};
+
 export const BidService = {
   addBid,
   declinedBid,
+  bidHistory,
 };

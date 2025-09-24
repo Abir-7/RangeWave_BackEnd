@@ -17,7 +17,10 @@ export const auth =
 
       if (!tokenWithBearer || !tokenWithBearer.startsWith("Bearer")) {
         return next(
-          new AppError(status.UNAUTHORIZED, "You are not authorized")
+          new AppError(
+            status.UNAUTHORIZED,
+            "Session data not found. Try again after login."
+          )
         );
       }
 
@@ -39,21 +42,20 @@ export const auth =
       const userData = await User.findById({ _id: decodedData.userId });
 
       if (!userData) {
-        return next(
-          new AppError(status.UNAUTHORIZED, "You are not authorized")
-        );
+        return next(new AppError(status.UNAUTHORIZED, "Account not found."));
       }
       //logger.info("user data found");
 
       if (!userData.isVerified) {
-        return next(
-          new AppError(status.UNAUTHORIZED, "You are not authorized")
-        );
+        return next(new AppError(status.UNAUTHORIZED, "Account not verified."));
       }
       //logger.info("user is verified");
       if (userRole.length && !userRole.includes(decodedData.userRole)) {
         return next(
-          new AppError(status.UNAUTHORIZED, "You are not authorized")
+          new AppError(
+            status.UNAUTHORIZED,
+            "You don't have permission to access."
+          )
         );
       }
       // logger.info("role included");
@@ -61,9 +63,7 @@ export const auth =
         userData.role !== decodedData.userRole ||
         userData.email !== decodedData.userEmail
       ) {
-        return next(
-          new AppError(status.UNAUTHORIZED, "You are not authorized")
-        );
+        return next(new AppError(status.UNAUTHORIZED, "Account not found."));
       }
       logger.info("role matched. auth ok");
       req.user = decodedData;
@@ -71,7 +71,7 @@ export const auth =
       return next();
     } catch (error) {
       return next(
-        new AppError(status.UNAUTHORIZED, "Invalid or expired token")
+        new AppError(status.UNAUTHORIZED, "Session expired.Please login again.")
       );
     }
   };

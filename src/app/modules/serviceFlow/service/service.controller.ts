@@ -118,6 +118,7 @@ const getAllRequestedService = catchAsync(
   async (req: Request, res: Response) => {
     console.time();
     const result = await ServiceService.getAllRequestedService(
+      req.user.userId,
       req.body.coordinate
     );
     console.timeEnd();

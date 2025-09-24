@@ -1,0 +1,33 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+import carData from "./car-model.json";
+import { Car } from "./carModel.interface.model";
+import logger from "../../utils/logger";
+
+export const seedCars = async () => {
+  try {
+    logger.info("🌱 Starting car seed...");
+
+    const cars = Object.values(carData).map((model) => ({ model }));
+
+    const batchSize = 5000;
+    for (let i = 0; i < cars.length; i += batchSize) {
+      const chunk = cars.slice(i, i + batchSize);
+
+      // create bulk operations
+      const operations = chunk.map((car) => ({
+        updateOne: {
+          filter: { model: car.model },
+          update: { $set: car },
+          upsert: true, // insert if not exists
+        },
+      }));
+
+      await Car.bulkWrite(operations, { ordered: false });
+      logger.info(`Processed ${i + chunk.length}/${cars.length}`);
+    }
+
+    logger.info("✅ Car data seeded successfully!");
+  } catch (error) {
+    logger.error("❌ Error seeding car data:", error);
+  }
+};

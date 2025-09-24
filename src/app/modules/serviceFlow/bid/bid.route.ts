@@ -12,5 +12,6 @@ router.post(
   BidController.addBid
 );
 router.post("/decline-bid", auth("MECHANIC"), BidController.declinedBid);
+router.get("/bid-history", auth("MECHANIC"), BidController.bidHistory);
 
 export const BidRoute = router;

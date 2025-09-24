@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
 import { auth } from "../../../middleware/auth/auth";
+import { getCarsData } from "../../carModel/carModel.controller.service";
 
 const router = Router();
 
@@ -82,5 +83,7 @@ router.get(
   auth("USER"),
   ServiceController.addNewBidDataToService
 );
+
+router.get("/find-car", getCarsData);
 
 export const ServiceRoute = router;
