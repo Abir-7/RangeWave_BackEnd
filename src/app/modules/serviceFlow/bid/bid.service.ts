@@ -257,7 +257,7 @@ const bidHistory = async (mechanicId: string) => {
       $project: {
         _id: 1,
         service: "$$ROOT",
-        user: "$userProfile",
+        //  user: "$userProfile",
         bidStatus: 1,
       },
     },
