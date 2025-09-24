@@ -141,134 +141,84 @@ const declinedBid = async (
 const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
 
-  const data = await Service.aggregate([
-    // 1. Lookup bid by this mechanic for this service, exclude declined bids
+  const bids = await Bid.aggregate([
+    { $match: { mechanicId: mechanicObjectId } },
+
+    // Lookup corresponding payments
     {
       $lookup: {
-        from: "bids",
-        let: { serviceId: "$_id" },
+        from: "payments",
+        let: { bidId: "$_id", serviceId: "$reqServiceId" },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ["$reqServiceId", "$$serviceId"] },
+                  { $eq: ["$serviceId", "$$serviceId"] },
                   { $eq: ["$mechanicId", mechanicObjectId] },
-                  { $ne: ["$status", "declined"] }, // exclude declined bids
                 ],
               },
             },
           },
-          { $limit: 1 },
         ],
-        as: "bid",
-      },
-    },
-
-    // 2. Only keep services where this mechanic has a bid (not declined)
-    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } },
-
-    // 3. Lookup payments for this service
-    {
-      $lookup: {
-        from: "payments",
-        localField: "_id",
-        foreignField: "serviceId",
         as: "payments",
       },
     },
 
-    // 4. Lookup user profile (service creator)
+    // Lookup the service for this bid
+    {
+      $lookup: {
+        from: "services",
+        localField: "reqServiceId",
+        foreignField: "_id",
+        as: "service",
+      },
+    },
+    { $unwind: "$service" },
+
+    // Lookup user profile of the service requester
     {
       $lookup: {
         from: "userprofiles",
-        localField: "user",
+        localField: "service.user",
         foreignField: "user",
         as: "userProfile",
       },
     },
     { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
 
-    // 5. Compute bidStatus
+    // Add customerStatus based on payments
     {
       $addFields: {
-        bidStatus: {
-          $switch: {
-            branches: [
-              // accepted: payment exists for this bid
-              {
-                case: {
-                  $and: [
-                    { $ne: ["$bid", null] },
-                    {
-                      $in: [
-                        "$bid._id",
-                        {
-                          $map: {
-                            input: "$payments",
-                            as: "p",
-                            in: "$$p.bidId",
-                          },
-                        },
-                      ],
+        customerStatus: {
+          $cond: [
+            { $eq: [{ $size: "$payments" }, 0] },
+            "pending",
+            {
+              $cond: [
+                {
+                  $anyElementTrue: {
+                    $map: {
+                      input: "$payments",
+                      as: "p",
+                      in: { $eq: ["$$p.bidId", "$_id"] },
                     },
-                  ],
+                  },
                 },
-                then: "accepted",
-              },
-              // rejected: payment exists for this service but not for this bid
-              {
-                case: {
-                  $and: [
-                    { $ne: ["$bid", null] },
-                    { $gt: [{ $size: "$payments" }, 0] },
-                    {
-                      $not: {
-                        $in: [
-                          "$bid._id",
-                          {
-                            $map: {
-                              input: "$payments",
-                              as: "p",
-                              in: "$$p.bidId",
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  ],
-                },
-                then: "rejected",
-              },
-              // pending: no payment for this service
-              {
-                case: { $eq: ["$payments", []] },
-                then: "pending",
-              },
-            ],
-            default: "pending",
-          },
+                "accepted",
+                "rejected",
+              ],
+            },
+          ],
         },
       },
     },
 
-    // 6. Project only required fields
-    {
-      $project: {
-        _id: 1,
-        service: "$$ROOT",
-        //  user: "$userProfile",
-        bidStatus: 1,
-      },
-    },
+    // Sort latest bids first
+    { $sort: { createdAt: -1 } },
   ]);
 
-  return data.map((m) => {
-    if (m.service) {
-      delete m.service.payments;
-    }
-    return m;
-  });
+  return bids;
 };
 
 export const BidService = {
