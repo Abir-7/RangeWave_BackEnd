@@ -153,7 +153,7 @@ const bidHistory = async (mechanicId: string) => {
                 $and: [
                   { $eq: ["$reqServiceId", "$$serviceId"] },
                   { $eq: ["$mechanicId", mechanicObjectId] },
-                  { $ne: ["$status", "declined"] },
+                  { $ne: ["$status", "declined"] }, // exclude declined
                 ],
               },
             },
@@ -165,7 +165,7 @@ const bidHistory = async (mechanicId: string) => {
     },
     { $unwind: { path: "$bid", preserveNullAndEmptyArrays: true } },
 
-    // 2. Lookup payment(s) for this service
+    // 2. Lookup payments for this service
     {
       $lookup: {
         from: "payments",
@@ -175,7 +175,7 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
 
-    // 3. Lookup user profile (creator of the service)
+    // 3. Lookup user profile (creator of service)
     {
       $lookup: {
         from: "userprofiles",
@@ -192,7 +192,7 @@ const bidHistory = async (mechanicId: string) => {
         bidStatus: {
           $switch: {
             branches: [
-              // accepted: payment exists for same bidId
+              // accepted: payment exists for this bid
               {
                 case: {
                   $and: [
@@ -213,7 +213,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "accepted",
               },
-              // rejected: payment exists for service but not for this bid
+              // rejected: payments exist but not for this bid
               {
                 case: {
                   $and: [
@@ -237,7 +237,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "rejected",
               },
-              // pending: no payment for service yet
+              // pending: no payment for this service
               {
                 case: { $eq: ["$payments", []] },
                 then: "pending",
@@ -249,15 +249,13 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
 
-    // 5. Project only required fields
+    // 5. Project only required fields (no $project mix errors)
     {
       $project: {
-        _id: "$_id",
+        _id: 1,
         service: "$$ROOT",
         user: "$userProfile",
         bidStatus: 1,
-        bid: 0,
-        payments: 0,
       },
     },
   ]);
