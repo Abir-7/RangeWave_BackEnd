@@ -526,9 +526,12 @@ const seeCurrentServiceProgress = async (pId: string) => {
 
 //-------------------------------mechanic-------------------------------------------
 
-const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
+const getAllRequestedService = async (
+  mechanicId: string,
+  mechanicCoordinate: [number, number]
+) => {
   const aggregateArray: PipelineStage[] = [
-    // 1. Match services with status FINDING
+    // 1. Match services that are FINDING
     {
       $match: {
         status: Status.FINDING,
@@ -551,12 +554,32 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
       },
     },
 
-    // 3. Remove services where ALL bids are declined
+    // 3. Remove services where this mechanic has only declined bids
     {
       $match: {
         $expr: {
           $or: [
-            { $eq: [{ $size: "$bids" }, 0] }, // keep if no bids
+            // Mechanic has no bids for this service
+            {
+              $eq: [
+                {
+                  $size: {
+                    $filter: {
+                      input: "$bids",
+                      as: "b",
+                      cond: {
+                        $eq: [
+                          "$$b.mechanicId",
+                          mongoose.Types.ObjectId(mechanicId),
+                        ],
+                      },
+                    },
+                  },
+                },
+                0,
+              ],
+            },
+            // Mechanic has at least one non-declined bid
             {
               $gt: [
                 {
@@ -564,13 +587,23 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
                     $filter: {
                       input: "$bids",
                       as: "b",
-                      cond: { $ne: ["$$b.status", BidStatus.declined] },
+                      cond: {
+                        $and: [
+                          {
+                            $eq: [
+                              "$$b.mechanicId",
+                              mongoose.Types.ObjectId(mechanicId),
+                            ],
+                          },
+                          { $ne: ["$$b.status", BidStatus.declined] },
+                        ],
+                      },
                     },
                   },
                 },
                 0,
               ],
-            }, // keep if at least one non-declined bid
+            },
           ],
         },
       },
