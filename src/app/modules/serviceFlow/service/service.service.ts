@@ -570,7 +570,7 @@ const getAllRequestedService = async (
                       cond: {
                         $eq: [
                           "$$b.mechanicId",
-                          mongoose.Types.ObjectId(mechanicId),
+                          new mongoose.Types.ObjectId(mechanicId),
                         ],
                       },
                     },
@@ -592,7 +592,7 @@ const getAllRequestedService = async (
                           {
                             $eq: [
                               "$$b.mechanicId",
-                              mongoose.Types.ObjectId(mechanicId),
+                              new mongoose.Types.ObjectId(mechanicId),
                             ],
                           },
                           { $ne: ["$$b.status", BidStatus.declined] },
