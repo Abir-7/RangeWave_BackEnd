@@ -25,7 +25,19 @@ const declinedBid = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const bidHistory = catchAsync(async (req: Request, res: Response) => {
+  const bidData = req.body;
+  const result = await BidService.bidHistory(req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Bid declined successfully",
+    data: result,
+  });
+});
+
 export const BidController = {
   addBid,
   declinedBid,
+  bidHistory,
 };

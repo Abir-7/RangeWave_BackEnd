@@ -11,6 +11,7 @@ import { getSocket } from "../../../socket/socket";
 import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 import { Bid } from "./bid.model";
+import mongoose from "mongoose";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -137,7 +138,63 @@ const declinedBid = async (
   return service;
 };
 
+const bidHistory = async (mechanicId: string) => {
+  const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
+
+  const data = await Bid.aggregate([
+    // 1. Only bids by this mechanic with status = "provided"
+    { $match: { mechanicId: mechanicObjectId, status: "provided" } },
+
+    // 2. Lookup payment for this bid
+    {
+      $lookup: {
+        from: "payments",
+        localField: "_id",
+        foreignField: "bidId",
+        as: "payment",
+      },
+    },
+    { $unwind: { path: "$payment", preserveNullAndEmptyArrays: true } },
+
+    // 3. Lookup service details
+    {
+      $lookup: {
+        from: "services",
+        localField: "reqServiceId",
+        foreignField: "_id",
+        as: "service",
+      },
+    },
+    { $unwind: "$service" },
+
+    // 4. Lookup user profile of the service creator
+    {
+      $lookup: {
+        from: "userprofiles",
+        localField: "service.user",
+        foreignField: "user",
+        as: "user",
+      },
+    },
+    { $unwind: "$user" },
+
+    // 5. Project the final structure
+    {
+      $project: {
+        isAccepted: { $cond: [{ $ifNull: ["$payment", false] }, true, false] },
+        bid: "$$ROOT",
+        service: "$service",
+        user: "$user",
+        payment: "$payment",
+      },
+    },
+  ]);
+
+  return data;
+};
+
 export const BidService = {
   addBid,
   declinedBid,
+  bidHistory,
 };
