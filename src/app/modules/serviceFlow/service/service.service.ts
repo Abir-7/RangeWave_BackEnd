@@ -432,7 +432,7 @@ const getRunningService = async (userId: string) => {
     .select("-id -__v -createdAt -updatedAt");
 
   if (!payments.length) {
-    throw new AppError(status.NOT_FOUND, "Service not found.");
+    return [];
   }
 
   return payments;
