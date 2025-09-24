@@ -265,7 +265,6 @@ const bidHistory = async (mechanicId: string) => {
 
   return data.map((m) => {
     if (m.service) {
-      delete m.service.bid;
       delete m.service.payments;
     }
     return m;
