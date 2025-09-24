@@ -222,7 +222,27 @@ const bidHistory = async (mechanicId: string) => {
     { $sort: { createdAt: -1 } },
   ]);
 
-  return bids;
+  const formattedBids = bids.map((bid) => ({
+    _id: bid._id,
+    price: bid.price,
+    reqServiceId: bid.reqServiceId,
+    mechanicId: bid.mechanicId,
+    status: bid.status,
+    customerStatus: bid.customerStatus,
+    service: {
+      _id: bid.service._id,
+      issue: bid.service.issue,
+      description: bid.service.description,
+    },
+    userProfile: {
+      _id: bid.userProfile?._id || null,
+      fullName: bid.userProfile?.fullName || "",
+      email: bid.userProfile?.email || "",
+      image: bid.userProfile?.image || "",
+    },
+  }));
+
+  return formattedBids;
 };
 
 export const BidService = {
