@@ -142,7 +142,11 @@ const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
 
   const bids = await Bid.aggregate([
+    // Filter bids for this mechanic
     { $match: { mechanicId: mechanicObjectId } },
+
+    // Exclude declined bids
+    { $match: { status: { $ne: "declined" } } },
 
     // Lookup corresponding payments
     {
