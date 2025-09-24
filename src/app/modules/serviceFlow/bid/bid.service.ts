@@ -142,7 +142,6 @@ const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
 
   const data = await Service.aggregate([
-    // 1. Lookup bid by this mechanic for this service, exclude declined
     {
       $lookup: {
         from: "bids",
@@ -164,11 +163,7 @@ const bidHistory = async (mechanicId: string) => {
         as: "bid",
       },
     },
-
-    // 2. Only keep services where mechanic has a bid
     { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } },
-
-    // 3. Lookup payments for this service
     {
       $lookup: {
         from: "payments",
@@ -177,8 +172,6 @@ const bidHistory = async (mechanicId: string) => {
         as: "payments",
       },
     },
-
-    // 4. Lookup user profile (service creator)
     {
       $lookup: {
         from: "userprofiles",
@@ -188,14 +181,11 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
     { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
-
-    // 5. Compute bidStatus
     {
       $addFields: {
         bidStatus: {
           $switch: {
             branches: [
-              // accepted
               {
                 case: {
                   $and: [
@@ -216,7 +206,6 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "accepted",
               },
-              // rejected
               {
                 case: {
                   $and: [
@@ -240,7 +229,6 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "rejected",
               },
-              // pending
               {
                 case: { $eq: ["$payments", []] },
                 then: "pending",
@@ -251,13 +239,11 @@ const bidHistory = async (mechanicId: string) => {
         },
       },
     },
-
-    // 6. Project only needed fields
     {
       $project: {
         _id: 1,
         bidStatus: 1,
-        mechanicPrice: "$bid.price", // include mechanic's bid price
+        mechanicPrice: "$bid.price",
         service: {
           _id: 1,
           issue: 1,
@@ -270,7 +256,7 @@ const bidHistory = async (mechanicId: string) => {
           schedule: 1,
           createdAt: 1,
           updatedAt: 1,
-          userProfile: 1, // service creator info
+          userProfile: 1,
         },
       },
     },
