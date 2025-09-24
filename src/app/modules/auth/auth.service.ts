@@ -1,4 +1,3 @@
-import { userRole } from "./../../interface/auth.interface";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
