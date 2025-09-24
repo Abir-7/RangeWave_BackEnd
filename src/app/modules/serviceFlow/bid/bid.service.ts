@@ -140,52 +140,124 @@ const declinedBid = async (
 
 const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
+  const data = await Service.aggregate([
+    // 1. Lookup bid by this mechanic for this service, exclude declined
+    {
+      $lookup: {
+        from: "bids",
+        let: { serviceId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$reqServiceId", "$$serviceId"] },
+                  { $eq: ["$mechanicId", mechanicObjectId] },
+                  { $ne: ["$status", "declined"] },
+                ],
+              },
+            },
+          },
+          { $limit: 1 },
+        ],
+        as: "bid",
+      },
+    },
+    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: true } },
 
-  const data = await Bid.aggregate([
-    // 1. Only bids by this mechanic with status = "provided"
-    { $match: { mechanicId: mechanicObjectId, status: "provided" } },
-
-    // 2. Lookup payment for this bid
+    // 2. Lookup payment(s) for this service
     {
       $lookup: {
         from: "payments",
         localField: "_id",
-        foreignField: "bidId",
-        as: "payment",
+        foreignField: "serviceId",
+        as: "payments",
       },
     },
-    { $unwind: { path: "$payment", preserveNullAndEmptyArrays: true } },
 
-    // 3. Lookup service details
-    {
-      $lookup: {
-        from: "services",
-        localField: "reqServiceId",
-        foreignField: "_id",
-        as: "service",
-      },
-    },
-    { $unwind: "$service" },
-
-    // 4. Lookup user profile of the service creator
+    // 3. Lookup user profile (creator of the service)
     {
       $lookup: {
         from: "userprofiles",
-        localField: "service.user",
+        localField: "user",
         foreignField: "user",
-        as: "user",
+        as: "userProfile",
       },
     },
-    { $unwind: "$user" },
+    { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
 
-    // 5. Project the final structure
+    // 4. Compute bidStatus
+    {
+      $addFields: {
+        bidStatus: {
+          $switch: {
+            branches: [
+              // accepted: payment exists for same bidId
+              {
+                case: {
+                  $and: [
+                    { $ne: ["$bid", null] },
+                    {
+                      $in: [
+                        "$bid._id",
+                        {
+                          $map: {
+                            input: "$payments",
+                            as: "p",
+                            in: "$$p.bidId",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+                then: "accepted",
+              },
+              // rejected: payment exists for service but not for this bid
+              {
+                case: {
+                  $and: [
+                    { $ne: ["$bid", null] },
+                    { $gt: [{ $size: "$payments" }, 0] },
+                    {
+                      $not: {
+                        $in: [
+                          "$bid._id",
+                          {
+                            $map: {
+                              input: "$payments",
+                              as: "p",
+                              in: "$$p.bidId",
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+                then: "rejected",
+              },
+              // pending: no payment for service yet
+              {
+                case: { $eq: ["$payments", []] },
+                then: "pending",
+              },
+            ],
+            default: "pending",
+          },
+        },
+      },
+    },
+
+    // 5. Project only required fields
     {
       $project: {
-        isAccepted: { $cond: [{ $ifNull: ["$payment", false] }, true, false] },
-        bid: "$$ROOT",
-        service: "$service",
-        user: "$user",
-        payment: "$payment",
+        _id: "$_id",
+        service: "$$ROOT",
+        user: "$userProfile",
+        bidStatus: 1,
+        bid: 0,
+        payments: 0,
       },
     },
   ]);
