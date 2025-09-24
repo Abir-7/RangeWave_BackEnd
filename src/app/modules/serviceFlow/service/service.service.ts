@@ -701,14 +701,8 @@ const getAllRequestedService = async (
   mechanicCoordinate: [number, number]
 ) => {
   const aggregateArray = [
-    // 1. Only services that are FINDING
-    {
-      $match: {
-        status: "FINDING",
-      },
-    },
+    { $match: { status: "FINDING" } },
 
-    // 2. Lookup all bids for the service
     {
       $lookup: {
         from: "bids",
@@ -718,7 +712,7 @@ const getAllRequestedService = async (
       },
     },
 
-    // 3. Lookup the mechanic’s own bid (if any)
+    // Lookup mechanic's own bid
     {
       $lookup: {
         from: "bids",
@@ -744,14 +738,19 @@ const getAllRequestedService = async (
         as: "mechanicBid",
       },
     },
+    { $unwind: { path: "$mechanicBid", preserveNullAndEmptyArrays: true } },
+
+    // Remove services where same mechanic declined
     {
-      $unwind: {
-        path: "$mechanicBid",
-        preserveNullAndEmptyArrays: true,
+      $match: {
+        $or: [
+          { mechanicBid: { $exists: false } },
+          { "mechanicBid.status": "provided" },
+        ],
       },
     },
 
-    // 4. Lookup user profile
+    // Lookup profile and ratings
     {
       $lookup: {
         from: "userprofiles",
@@ -760,8 +759,6 @@ const getAllRequestedService = async (
         as: "profileData",
       },
     },
-
-    // 5. Lookup user ratings
     {
       $lookup: {
         from: "userratings",
@@ -771,16 +768,9 @@ const getAllRequestedService = async (
       },
     },
 
-    // 6. Add mechanic price, isBidDone, avgRating, location
     {
       $addFields: {
-        price: {
-          $cond: [
-            { $eq: ["$mechanicBid.status", "provided"] },
-            "$mechanicBid.price",
-            null,
-          ],
-        },
+        price: { $ifNull: ["$mechanicBid.price", null] },
         isBidDone: {
           $cond: [{ $eq: ["$mechanicBid.status", "provided"] }, true, false],
         },
@@ -792,7 +782,6 @@ const getAllRequestedService = async (
       },
     },
 
-    // 7. Remove unnecessary fields
     {
       $project: {
         "profileData.carInfo": 0,
@@ -804,10 +793,9 @@ const getAllRequestedService = async (
     },
   ];
 
-  // Run aggregation
   const data = await Service.aggregate(aggregateArray);
 
-  // 8. Calculate distance for each service
+  // Add distance
   const enriched = data.map((service: any) => ({
     ...service,
     distanceKm: calculateDistance(
