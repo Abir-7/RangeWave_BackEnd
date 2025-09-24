@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import mongoose from "mongoose";
 import carData from "./car-model.json";
 import { Car } from "./carModel.interface.model";
 import logger from "../../utils/logger";
@@ -28,9 +27,7 @@ export const seedCars = async () => {
     }
 
     logger.info("✅ Car data seeded successfully!");
-    await mongoose.connection.close();
   } catch (error) {
     logger.error("❌ Error seeding car data:", error);
-    await mongoose.connection.close();
   }
 };
