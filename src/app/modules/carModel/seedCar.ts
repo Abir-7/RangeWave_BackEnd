@@ -8,8 +8,6 @@ export const seedCars = async () => {
   try {
     logger.info("🌱 Starting car seed...");
 
-    await mongoose.connect("mongodb://127.0.0.1:27017/yourdbname");
-
     // Clear existing (optional, remove if not needed)
     await Car.deleteMany({});
 
