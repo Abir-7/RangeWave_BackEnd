@@ -696,139 +696,55 @@ const seeCurrentServiceProgress = async (pId: string) => {
 //   return enriched;
 // };
 
-const getAllRequestedService = async (
-  mechanicId: string,
-  mechanicCoordinate: [number, number]
-) => {
-  const aggregateArray: PipelineStage[] = [
-    // 1. Match services that are FINDING
-    {
-      $match: {
-        status: Status.FINDING,
-      },
-    },
-
-    // 2. Lookup bids for each service
+const getMechanicServiceRequests = async (mechanicId: string) => {
+  const requests = await Service.aggregate([
     {
       $lookup: {
         from: "bids",
-        let: { serviceId: "$_id" },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
-            },
-          },
-        ],
+        localField: "_id",
+        foreignField: "serviceRequestId",
         as: "bids",
       },
     },
-
-    // 3. Remove services where this mechanic has only declined bids
-    {
-      $match: {
-        $expr: {
-          $or: [
-            // Mechanic has no bids for this service
-            {
-              $eq: [
-                {
-                  $size: {
-                    $filter: {
-                      input: "$bids",
-                      as: "b",
-                      cond: {
-                        $eq: [
-                          "$$b.mechanicId",
-                          new mongoose.Types.ObjectId(mechanicId),
-                        ],
-                      },
-                    },
-                  },
-                },
-                0,
-              ],
-            },
-            // Mechanic has at least one non-declined bid
-            {
-              $gt: [
-                {
-                  $size: {
-                    $filter: {
-                      input: "$bids",
-                      as: "b",
-                      cond: {
-                        $and: [
-                          {
-                            $eq: [
-                              "$$b.mechanicId",
-                              new mongoose.Types.ObjectId(mechanicId),
-                            ],
-                          },
-                          { $ne: ["$$b.status", BidStatus.declined] },
-                        ],
-                      },
-                    },
-                  },
-                },
-                0,
-              ],
-            },
-          ],
-        },
-      },
-    },
-
-    // 4. Extract this mechanic’s bid (if any)
-    {
-      $addFields: {
-        mechanicBid: {
-          $arrayElemAt: [
-            {
-              $filter: {
-                input: "$bids",
-                as: "b",
-                cond: {
-                  $eq: [
-                    "$$b.mechanicId",
-                    new mongoose.Types.ObjectId(mechanicId),
-                  ],
-                },
-              },
-            },
-            0,
-          ],
-        },
-      },
-    },
-
-    // 5. Lookup user profile
     {
       $lookup: {
-        from: "userprofiles",
+        from: "ratings",
         localField: "user",
-        foreignField: "user",
-        as: "profileData",
-      },
-    },
-
-    // 6. Lookup user ratings
-    {
-      $lookup: {
-        from: "userratings",
-        let: { userId: { $arrayElemAt: ["$profileData.user", 0] } },
-        pipeline: [
-          {
-            $match: {
-              $expr: { $eq: ["$mechanicId", "$$userId"] },
-            },
-          },
-        ],
+        foreignField: "userId",
         as: "userRatings",
       },
     },
-
-    // 7. Filter out declined bids and add calculated fields
+    {
+      $lookup: {
+        from: "bids",
+        let: { requestId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$serviceRequestId", "$$requestId"] },
+                  {
+                    $eq: [
+                      "$mechanicId",
+                      new mongoose.Types.ObjectId(mechanicId),
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+          { $limit: 1 },
+        ],
+        as: "mechanicBid",
+      },
+    },
+    {
+      $unwind: {
+        path: "$mechanicBid",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
     {
       $addFields: {
         bids: {
@@ -838,7 +754,7 @@ const getAllRequestedService = async (
             cond: { $ne: ["$$b.status", BidStatus.declined] },
           },
         },
-        mechanicPrice: { $ifNull: ["$mechanicBid.price", null] }, // 👈 price this mechanic gave
+        price: { $ifNull: ["$mechanicBid.price", null] }, // 👈 renamed field
         isBidDone: {
           $gt: [
             {
@@ -846,7 +762,17 @@ const getAllRequestedService = async (
                 $filter: {
                   input: "$bids",
                   as: "b",
-                  cond: { $eq: ["$$b.status", BidStatus.provided] },
+                  cond: {
+                    $and: [
+                      {
+                        $eq: [
+                          "$$b.mechanicId",
+                          new mongoose.Types.ObjectId(mechanicId),
+                        ],
+                      },
+                      { $eq: ["$$b.status", BidStatus.provided] },
+                    ],
+                  },
                 },
               },
             },
@@ -860,35 +786,9 @@ const getAllRequestedService = async (
         avgRating: { $ifNull: [{ $avg: "$userRatings.rating" }, 0] },
       },
     },
+  ]);
 
-    // 8. Project unnecessary fields
-    {
-      $project: {
-        "profileData.carInfo": 0,
-        "profileData.location": 0,
-        bids: 0,
-        userRatings: 0,
-        mechanicBid: 0, // hide full bid object
-      },
-    },
-  ];
-
-  const data = await Service.aggregate(aggregateArray);
-
-  // 9. Add distance calculation in JS
-  const enriched = data.map((service: any) => {
-    const distance = calculateDistance(
-      mechanicCoordinate,
-      service.location.coordinates
-    );
-
-    return {
-      ...service,
-      distanceKm: distance,
-    };
-  });
-
-  return enriched;
+  return requests;
 };
 
 const changeServiceStatus = async (
