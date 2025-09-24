@@ -696,24 +696,29 @@ const seeCurrentServiceProgress = async (pId: string) => {
 //   return enriched;
 // };
 
-const getAllRequestedService = async (mechanicId: string) => {
-  const requests = await Service.aggregate([
+const getAllRequestedService = async (
+  mechanicId: string,
+  mechanicCoordinate: [number, number]
+) => {
+  const aggregateArray = [
+    // 1. Only services that are FINDING
+    {
+      $match: {
+        status: "FINDING",
+      },
+    },
+
+    // 2. Lookup all bids for the service
     {
       $lookup: {
         from: "bids",
         localField: "_id",
-        foreignField: "serviceRequestId",
+        foreignField: "reqServiceId",
         as: "bids",
       },
     },
-    {
-      $lookup: {
-        from: "ratings",
-        localField: "user",
-        foreignField: "userId",
-        as: "userRatings",
-      },
-    },
+
+    // 3. Lookup the mechanic’s own bid (if any)
     {
       $lookup: {
         from: "bids",
@@ -723,7 +728,7 @@ const getAllRequestedService = async (mechanicId: string) => {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ["$serviceRequestId", "$$requestId"] },
+                  { $eq: ["$reqServiceId", "$$requestId"] },
                   {
                     $eq: [
                       "$mechanicId",
@@ -745,39 +750,39 @@ const getAllRequestedService = async (mechanicId: string) => {
         preserveNullAndEmptyArrays: true,
       },
     },
+
+    // 4. Lookup user profile
+    {
+      $lookup: {
+        from: "userprofiles",
+        localField: "user",
+        foreignField: "user",
+        as: "profileData",
+      },
+    },
+
+    // 5. Lookup user ratings
+    {
+      $lookup: {
+        from: "userratings",
+        let: { userId: { $arrayElemAt: ["$profileData.user", 0] } },
+        pipeline: [{ $match: { $expr: { $eq: ["$mechanicId", "$$userId"] } } }],
+        as: "userRatings",
+      },
+    },
+
+    // 6. Add mechanic price, isBidDone, avgRating, location
     {
       $addFields: {
-        bids: {
-          $filter: {
-            input: "$bids",
-            as: "b",
-            cond: { $ne: ["$$b.status", BidStatus.declined] },
-          },
-        },
-        price: { $ifNull: ["$mechanicBid.price", null] }, // 👈 renamed field
-        isBidDone: {
-          $gt: [
-            {
-              $size: {
-                $filter: {
-                  input: "$bids",
-                  as: "b",
-                  cond: {
-                    $and: [
-                      {
-                        $eq: [
-                          "$$b.mechanicId",
-                          new mongoose.Types.ObjectId(mechanicId),
-                        ],
-                      },
-                      { $eq: ["$$b.status", BidStatus.provided] },
-                    ],
-                  },
-                },
-              },
-            },
-            0,
+        price: {
+          $cond: [
+            { $eq: ["$mechanicBid.status", "provided"] },
+            "$mechanicBid.price",
+            null,
           ],
+        },
+        isBidDone: {
+          $cond: [{ $eq: ["$mechanicBid.status", "provided"] }, true, false],
         },
         location: {
           placeId: "$location.placeId",
@@ -786,9 +791,32 @@ const getAllRequestedService = async (mechanicId: string) => {
         avgRating: { $ifNull: [{ $avg: "$userRatings.rating" }, 0] },
       },
     },
-  ]);
 
-  return requests;
+    // 7. Remove unnecessary fields
+    {
+      $project: {
+        "profileData.carInfo": 0,
+        "profileData.location": 0,
+        bids: 0,
+        userRatings: 0,
+        mechanicBid: 0,
+      },
+    },
+  ];
+
+  // Run aggregation
+  const data = await Service.aggregate(aggregateArray);
+
+  // 8. Calculate distance for each service
+  const enriched = data.map((service: any) => ({
+    ...service,
+    distanceKm: calculateDistance(
+      mechanicCoordinate,
+      service.location.coordinates
+    ),
+  }));
+
+  return enriched;
 };
 
 const changeServiceStatus = async (
