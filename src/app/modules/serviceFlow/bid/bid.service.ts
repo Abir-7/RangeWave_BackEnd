@@ -141,7 +141,7 @@ const declinedBid = async (
 const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
   const data = await Service.aggregate([
-    // 1. Lookup bid by this mechanic for this service, exclude declined
+    // 1. Lookup bid by this mechanic for this service, exclude declined bids
     {
       $lookup: {
         from: "bids",
@@ -153,7 +153,7 @@ const bidHistory = async (mechanicId: string) => {
                 $and: [
                   { $eq: ["$reqServiceId", "$$serviceId"] },
                   { $eq: ["$mechanicId", mechanicObjectId] },
-                  { $ne: ["$status", "declined"] }, // exclude declined
+                  { $ne: ["$status", "declined"] },
                 ],
               },
             },
@@ -163,7 +163,7 @@ const bidHistory = async (mechanicId: string) => {
         as: "bid",
       },
     },
-    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } }, // <- only keep services where bid exists
+    { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } },
 
     // 2. Lookup payments for this service
     {
@@ -192,7 +192,7 @@ const bidHistory = async (mechanicId: string) => {
         bidStatus: {
           $switch: {
             branches: [
-              // accepted: payment exists for this bid
+              // accepted
               {
                 case: {
                   $and: [
@@ -213,7 +213,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "accepted",
               },
-              // rejected: payments exist for service but not for this bid
+              // rejected
               {
                 case: {
                   $and: [
@@ -237,7 +237,7 @@ const bidHistory = async (mechanicId: string) => {
                 },
                 then: "rejected",
               },
-              // pending: no payment for this service
+              // pending
               {
                 case: { $eq: ["$payments", []] },
                 then: "pending",
@@ -253,9 +253,21 @@ const bidHistory = async (mechanicId: string) => {
     {
       $project: {
         _id: 1,
-        service: "$$ROOT",
-        user: "$userProfile",
         bidStatus: 1,
+        service: {
+          _id: 1,
+          issue: 1,
+          description: 1,
+          user: 1,
+          status: 1,
+          isServiceCompleted: 1,
+          location: 1,
+          bidId: 1,
+          schedule: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userProfile: 1, // include userProfile inside service
+        },
       },
     },
   ]);
