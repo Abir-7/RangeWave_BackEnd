@@ -528,11 +528,14 @@ const seeCurrentServiceProgress = async (pId: string) => {
 
 const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
   const aggregateArray: PipelineStage[] = [
+    // 1. Match services with status FINDING
     {
       $match: {
         status: Status.FINDING,
       },
     },
+
+    // 2. Lookup bids for each service
     {
       $lookup: {
         from: "bids",
@@ -547,8 +550,9 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
         as: "bids",
       },
     },
+
+    // 3. Remove services where ALL bids are declined
     {
-      // Remove services where ALL bids are declined
       $match: {
         $expr: {
           $or: [
@@ -566,11 +570,13 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
                 },
                 0,
               ],
-            }, // keep if there's at least one non-declined bid
+            }, // keep if at least one non-declined bid
           ],
         },
       },
     },
+
+    // 4. Lookup user profile
     {
       $lookup: {
         from: "userprofiles",
@@ -580,8 +586,7 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
       },
     },
 
-    //rating - section ---new add...if error just remove this
-
+    // 5. Lookup user ratings
     {
       $lookup: {
         from: "userratings",
@@ -596,10 +601,17 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
         as: "userRatings",
       },
     },
-    //-------------------------
 
+    // 6. Filter out declined bids and add calculated fields
     {
       $addFields: {
+        bids: {
+          $filter: {
+            input: "$bids",
+            as: "b",
+            cond: { $ne: ["$$b.status", BidStatus.declined] },
+          },
+        },
         isBidDone: {
           $gt: [
             {
@@ -618,11 +630,11 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
           placeId: "$location.placeId",
           coordinates: "$location.coordinates.coordinates",
         },
-        //---------------------rating-------------
         avgRating: { $ifNull: [{ $avg: "$userRatings.rating" }, 0] },
       },
-      //----------------------------------
     },
+
+    // 7. Project unnecessary fields
     {
       $project: {
         "profileData.carInfo": 0,
@@ -635,6 +647,7 @@ const getAllRequestedService = async (mechanicCoordinate: [number, number]) => {
 
   const data = await Service.aggregate(aggregateArray);
 
+  // 8. Add distance calculation
   const enriched = data.map((service: any) => {
     const distance = calculateDistance(
       mechanicCoordinate,
