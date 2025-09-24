@@ -5,11 +5,8 @@ export interface ICar {
   model: string;
 }
 
-const CarSchema = new Schema<ICar>(
-  {
-    model: { type: String, required: true, unique: true, trim: true },
-  },
-  { timestamps: true }
-);
+const CarSchema = new Schema<ICar>({
+  model: { type: String, required: true, unique: true, trim: true },
+});
 
 export const Car = mongoose.model<ICar>("Car", CarSchema);
