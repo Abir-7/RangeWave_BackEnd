@@ -12,7 +12,7 @@ export const seedCars = async () => {
     await Car.deleteMany({});
 
     const cars = Object.values(carData).map((model) => ({ model }));
-
+    console.log(cars);
     // Batch insert in chunks of 5000 (good for 50k)
     const batchSize = 5000;
     for (let i = 0; i < cars.length; i += batchSize) {

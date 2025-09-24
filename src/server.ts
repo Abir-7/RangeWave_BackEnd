@@ -34,7 +34,7 @@ const main = async () => {
   logger.info("MongoDB connected");
   await seedAdmin();
   startConsumers();
-  seedCars();
+  await seedCars();
   await initSocket(server);
   server.listen(
     Number(appConfig.server.port),
