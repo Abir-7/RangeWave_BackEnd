@@ -50,7 +50,10 @@ const createUser = async (
   }
 
   if (isExist) {
-    throw new AppError(status.BAD_REQUEST, "Email already Exist");
+    throw new AppError(
+      status.BAD_REQUEST,
+      "An account already created with this email."
+    );
   }
 
   const session = await startSession(); // Start a session for the transaction
