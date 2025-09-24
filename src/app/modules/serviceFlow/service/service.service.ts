@@ -526,6 +526,176 @@ const seeCurrentServiceProgress = async (pId: string) => {
 
 //-------------------------------mechanic-------------------------------------------
 
+// const getAllRequestedService = async (
+//   mechanicId: string,
+//   mechanicCoordinate: [number, number]
+// ) => {
+//   const aggregateArray: PipelineStage[] = [
+//     // 1. Match services that are FINDING
+//     {
+//       $match: {
+//         status: Status.FINDING,
+//       },
+//     },
+
+//     // 2. Lookup bids for each service
+//     {
+//       $lookup: {
+//         from: "bids",
+//         let: { serviceId: "$_id" },
+//         pipeline: [
+//           {
+//             $match: {
+//               $expr: { $eq: ["$reqServiceId", "$$serviceId"] },
+//             },
+//           },
+//         ],
+//         as: "bids",
+//       },
+//     },
+
+//     // 3. Remove services where this mechanic has only declined bids
+//     {
+//       $match: {
+//         $expr: {
+//           $or: [
+//             // Mechanic has no bids for this service
+//             {
+//               $eq: [
+//                 {
+//                   $size: {
+//                     $filter: {
+//                       input: "$bids",
+//                       as: "b",
+//                       cond: {
+//                         $eq: [
+//                           "$$b.mechanicId",
+//                           new mongoose.Types.ObjectId(mechanicId),
+//                         ],
+//                       },
+//                     },
+//                   },
+//                 },
+//                 0,
+//               ],
+//             },
+//             // Mechanic has at least one non-declined bid
+//             {
+//               $gt: [
+//                 {
+//                   $size: {
+//                     $filter: {
+//                       input: "$bids",
+//                       as: "b",
+//                       cond: {
+//                         $and: [
+//                           {
+//                             $eq: [
+//                               "$$b.mechanicId",
+//                               new mongoose.Types.ObjectId(mechanicId),
+//                             ],
+//                           },
+//                           { $ne: ["$$b.status", BidStatus.declined] },
+//                         ],
+//                       },
+//                     },
+//                   },
+//                 },
+//                 0,
+//               ],
+//             },
+//           ],
+//         },
+//       },
+//     },
+
+//     // 4. Lookup user profile
+//     {
+//       $lookup: {
+//         from: "userprofiles",
+//         localField: "user",
+//         foreignField: "user",
+//         as: "profileData",
+//       },
+//     },
+
+//     // 5. Lookup user ratings
+//     {
+//       $lookup: {
+//         from: "userratings",
+//         let: { userId: { $arrayElemAt: ["$profileData.user", 0] } },
+//         pipeline: [
+//           {
+//             $match: {
+//               $expr: { $eq: ["$mechanicId", "$$userId"] },
+//             },
+//           },
+//         ],
+//         as: "userRatings",
+//       },
+//     },
+
+//     // 6. Filter out declined bids and add calculated fields
+//     {
+//       $addFields: {
+//         bids: {
+//           $filter: {
+//             input: "$bids",
+//             as: "b",
+//             cond: { $ne: ["$$b.status", BidStatus.declined] },
+//           },
+//         },
+//         isBidDone: {
+//           $gt: [
+//             {
+//               $size: {
+//                 $filter: {
+//                   input: "$bids",
+//                   as: "b",
+//                   cond: { $eq: ["$$b.status", BidStatus.provided] },
+//                 },
+//               },
+//             },
+//             0,
+//           ],
+//         },
+//         location: {
+//           placeId: "$location.placeId",
+//           coordinates: "$location.coordinates.coordinates",
+//         },
+//         avgRating: { $ifNull: [{ $avg: "$userRatings.rating" }, 0] },
+//       },
+//     },
+
+//     // 7. Project unnecessary fields
+//     {
+//       $project: {
+//         "profileData.carInfo": 0,
+//         "profileData.location": 0,
+//         bids: 0,
+//         userRatings: 0,
+//       },
+//     },
+//   ];
+
+//   const data = await Service.aggregate(aggregateArray);
+
+//   // 8. Add distance calculation
+//   const enriched = data.map((service: any) => {
+//     const distance = calculateDistance(
+//       mechanicCoordinate,
+//       service.location.coordinates
+//     );
+
+//     return {
+//       ...service,
+//       distanceKm: distance,
+//     };
+//   });
+
+//   return enriched;
+// };
+
 const getAllRequestedService = async (
   mechanicId: string,
   mechanicCoordinate: [number, number]
@@ -609,7 +779,30 @@ const getAllRequestedService = async (
       },
     },
 
-    // 4. Lookup user profile
+    // 4. Extract this mechanic’s bid (if any)
+    {
+      $addFields: {
+        mechanicBid: {
+          $arrayElemAt: [
+            {
+              $filter: {
+                input: "$bids",
+                as: "b",
+                cond: {
+                  $eq: [
+                    "$$b.mechanicId",
+                    new mongoose.Types.ObjectId(mechanicId),
+                  ],
+                },
+              },
+            },
+            0,
+          ],
+        },
+      },
+    },
+
+    // 5. Lookup user profile
     {
       $lookup: {
         from: "userprofiles",
@@ -619,7 +812,7 @@ const getAllRequestedService = async (
       },
     },
 
-    // 5. Lookup user ratings
+    // 6. Lookup user ratings
     {
       $lookup: {
         from: "userratings",
@@ -635,7 +828,7 @@ const getAllRequestedService = async (
       },
     },
 
-    // 6. Filter out declined bids and add calculated fields
+    // 7. Filter out declined bids and add calculated fields
     {
       $addFields: {
         bids: {
@@ -645,6 +838,7 @@ const getAllRequestedService = async (
             cond: { $ne: ["$$b.status", BidStatus.declined] },
           },
         },
+        mechanicPrice: { $ifNull: ["$mechanicBid.price", null] }, // 👈 price this mechanic gave
         isBidDone: {
           $gt: [
             {
@@ -667,20 +861,21 @@ const getAllRequestedService = async (
       },
     },
 
-    // 7. Project unnecessary fields
+    // 8. Project unnecessary fields
     {
       $project: {
         "profileData.carInfo": 0,
         "profileData.location": 0,
         bids: 0,
         userRatings: 0,
+        mechanicBid: 0, // hide full bid object
       },
     },
   ];
 
   const data = await Service.aggregate(aggregateArray);
 
-  // 8. Add distance calculation
+  // 9. Add distance calculation in JS
   const enriched = data.map((service: any) => {
     const distance = calculateDistance(
       mechanicCoordinate,
