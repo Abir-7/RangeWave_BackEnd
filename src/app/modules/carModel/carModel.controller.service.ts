@@ -26,5 +26,5 @@ export const getCars = async (search: string = "") => {
 
   const cars = await Car.find(query).limit(20).lean();
 
-  return cars;
+  return cars.map((c) => c.model);
 };
