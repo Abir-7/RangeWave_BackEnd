@@ -8,17 +8,25 @@ export const seedCars = async () => {
   try {
     logger.info("🌱 Starting car seed...");
 
-    // Clear existing (optional, remove if not needed)
-    await Car.deleteMany({});
+    await mongoose.connect("mongodb://127.0.0.1:27017/yourdbname");
 
     const cars = Object.values(carData).map((model) => ({ model }));
 
-    // Batch insert in chunks of 5000 (good for 50k)
     const batchSize = 5000;
     for (let i = 0; i < cars.length; i += batchSize) {
       const chunk = cars.slice(i, i + batchSize);
-      await Car.insertMany(chunk, { ordered: false });
-      logger.info(`Inserted ${i + chunk.length}/${cars.length}`);
+
+      // create bulk operations
+      const operations = chunk.map((car) => ({
+        updateOne: {
+          filter: { model: car.model },
+          update: { $set: car },
+          upsert: true, // insert if not exists
+        },
+      }));
+
+      await Car.bulkWrite(operations, { ordered: false });
+      logger.info(`Processed ${i + chunk.length}/${cars.length}`);
     }
 
     logger.info("✅ Car data seeded successfully!");
@@ -28,5 +36,3 @@ export const seedCars = async () => {
     await mongoose.connection.close();
   }
 };
-
-// Run directly
