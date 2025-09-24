@@ -142,6 +142,7 @@ const bidHistory = async (mechanicId: string) => {
   const mechanicObjectId = new mongoose.Types.ObjectId(mechanicId);
 
   const data = await Service.aggregate([
+    // Lookup mechanic's bid for this service (exclude declined)
     {
       $lookup: {
         from: "bids",
@@ -164,6 +165,8 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
     { $unwind: { path: "$bid", preserveNullAndEmptyArrays: false } },
+
+    // Lookup payments for this service
     {
       $lookup: {
         from: "payments",
@@ -172,6 +175,8 @@ const bidHistory = async (mechanicId: string) => {
         as: "payments",
       },
     },
+
+    // Lookup user profile of the service creator
     {
       $lookup: {
         from: "userprofiles",
@@ -181,6 +186,8 @@ const bidHistory = async (mechanicId: string) => {
       },
     },
     { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
+
+    // Compute bidStatus
     {
       $addFields: {
         bidStatus: {
@@ -237,13 +244,16 @@ const bidHistory = async (mechanicId: string) => {
             default: "pending",
           },
         },
+        mechanicPrice: "$bid.price",
       },
     },
+
+    // Project only needed fields
     {
       $project: {
-        _id: 1,
+        _id: 0, // remove the root _id
         bidStatus: 1,
-        mechanicPrice: "$bid.price",
+        mechanicPrice: 1,
         service: {
           _id: 1,
           issue: 1,
