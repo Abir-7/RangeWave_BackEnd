@@ -696,7 +696,7 @@ const seeCurrentServiceProgress = async (pId: string) => {
 //   return enriched;
 // };
 
-const getMechanicServiceRequests = async (mechanicId: string) => {
+const getAllRequestedService = async (mechanicId: string) => {
   const requests = await Service.aggregate([
     {
       $lookup: {
