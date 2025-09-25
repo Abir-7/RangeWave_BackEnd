@@ -12,6 +12,7 @@ import { StripeRoute } from "../modules/stripe/stripe.route";
 import { ChatRoute } from "../modules/chat/room/room.route";
 import { MessageRoute } from "../modules/chat/message/message.route";
 import { DashboardRoute } from "../modules/dashboard/dashboard.route";
+import { PrivecyRoute } from "../modules/terms&privecy/termPrivecy.route";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ const apiRoutes = [
   { path: "/chat", route: ChatRoute },
   { path: "/chat", route: MessageRoute },
   { path: "/dashboard", route: DashboardRoute },
+  { path: "/privecy&term", route: PrivecyRoute },
 ];
 
 apiRoutes.forEach((route) => router.use(route.path, route.route));

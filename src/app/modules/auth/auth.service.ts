@@ -130,15 +130,21 @@ const userLogin = async (loginData: {
   }).select("+password");
   if (!user) throw new AppError(status.NOT_FOUND, "User not found");
 
-  if (user.role !== loginData.role) {
-    throw new AppError(
-      500,
-      `${
-        loginData.role === "USER"
-          ? "This account is registered as a mechanic and can't login as a customer"
-          : "This account is registered as a customer  and can't login as a mechanic"
-      }`
-    );
+  if (user.role !== "ADMIN") {
+    if (!loginData.role) {
+      throw new Error("User role not provided.");
+    }
+
+    if (user.role !== loginData.role) {
+      throw new AppError(
+        500,
+        `${
+          loginData.role === "USER"
+            ? "This account is registered as a mechanic and can't login as a customer"
+            : "This account is registered as a customer  and can't login as a mechanic"
+        }`
+      );
+    }
   }
 
   // 2. Check verification

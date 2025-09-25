@@ -116,10 +116,6 @@ const checkServiceStatusFinding = async (userId: string) => {
   const immediateService = services.filter((s) => !s.schedule?.isSchedule);
   const scheduledService = services.filter((s) => s.schedule?.isSchedule);
 
-  if (immediateService.length === 0 && scheduledService.length === 0) {
-    throw new AppError(status.NOT_FOUND, "No service found");
-  }
-
   return { immediateService, scheduledService };
 };
 
