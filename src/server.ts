@@ -33,7 +33,7 @@ process.on("SIGTERM", async () => {
 const main = async () => {
   await mongoose.connect(appConfig.database.dataBase_uri as string);
 
-  startCron();
+  //startCron();
 
   logger.info("MongoDB connected");
   await seedAdmin();
