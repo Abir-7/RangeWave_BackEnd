@@ -8,7 +8,7 @@ import logger from "./app/utils/logger";
 import { initSocket } from "./app/socket/socket";
 import { startConsumers } from "./app/rabbitMq/worker";
 import { seedCars } from "./app/modules/carModel/seedCar";
-import { startCron } from "./app/modules/cronJobs/cronJobs";
+//import { startCron } from "./app/modules/cronJobs/cronJobs";
 
 process.on("uncaughtException", (err) => {
   logger.error("Uncaught exception:", err);
