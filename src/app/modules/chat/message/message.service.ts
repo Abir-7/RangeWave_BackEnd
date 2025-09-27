@@ -61,7 +61,7 @@ const sendMessage = async (
         (user: { toString: () => string }) => user.toString() !== userId
       )[0]
       .toString();
-    console.log(userId);
+
     const reciverUser = await User.findOne({ user: reciverId._id });
 
     let reciver;
@@ -71,8 +71,8 @@ const sendMessage = async (
     } else {
       reciver = await UserProfile.findOne({ user: reciverId });
     }
-
-    console.log(reciver);
+    console.log(userId, "sender");
+    console.log(reciver, "reciver");
 
     const socketData = {
       _id: chatRoom._id,
