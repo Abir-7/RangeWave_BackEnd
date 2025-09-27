@@ -79,7 +79,7 @@ const sendMessage = async (
       lastMessage: [
         {
           _id: newMessage[0]._id,
-          roomId: newMessage[0],
+          roomId: newMessage[0].roomId.roomId,
           message: newMessage[0].message,
           sender: newMessage[0].sender,
           createdAt: newMessage[0].createdAt,
