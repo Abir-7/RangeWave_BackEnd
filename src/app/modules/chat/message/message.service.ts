@@ -54,14 +54,14 @@ const sendMessage = async (
       )[0]
       .toString();
 
-    const reciverUser = await User.findOne({ _id: reciverId });
+    const reciverUser = await User.findOne({ _id: userId });
 
     let reciver;
 
     if (reciverUser?.role === "MECHANIC") {
-      reciver = await MechanicProfile.findOne({ user: reciverId });
+      reciver = await MechanicProfile.findOne({ user: userId });
     } else {
-      reciver = await UserProfile.findOne({ user: reciverId });
+      reciver = await UserProfile.findOne({ user: userId });
     }
 
     const socketData = {
@@ -90,8 +90,6 @@ const sendMessage = async (
         },
       ],
     };
-
-    console.dir(socketData, { depth: null });
 
     io?.emit(`user-chat-list-${reciverId}`, socketData);
 
