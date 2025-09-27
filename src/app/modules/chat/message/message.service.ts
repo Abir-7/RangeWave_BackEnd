@@ -63,7 +63,7 @@ const sendMessage = async (
       )[0]
       .toString();
 
-    const reciverUser = await User.findOne({ user: reciverId });
+    const reciverUser = await User.findOne({ _id: reciverId });
 
     let reciver;
 
