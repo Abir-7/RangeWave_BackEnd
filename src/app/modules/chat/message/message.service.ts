@@ -6,6 +6,8 @@ import Message from "./message.model";
 
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import mongoose from "mongoose";
+import { io } from "../../../socket/socket";
+import { UserProfile } from "../../users/userProfile/userProfile.model";
 
 const sendMessage = async (
   userId: string,
@@ -17,17 +19,17 @@ const sendMessage = async (
     session.startTransaction();
 
     // Find the chat room by ID and check if userId is in users array
-    const chatRoom = await ChatRoom.findOne({
+    const chatRoom = (await ChatRoom.findOne({
       _id: data.roomId,
       users: userId,
-    }).session(session);
+    }).session(session)) as any;
 
     if (!chatRoom) {
       throw new Error("Chat room not found or user not authorized");
     }
 
     // Create the message within the transaction session
-    const newMessage = await Message.create(
+    const newMessage = (await Message.create(
       [
         {
           sender: userId,
@@ -35,7 +37,7 @@ const sendMessage = async (
         },
       ],
       { session }
-    );
+    )) as any;
 
     // Update chat room's lastMessage
     await ChatRoom.findByIdAndUpdate(
@@ -43,6 +45,51 @@ const sendMessage = async (
       { lastMessage: newMessage[0]._id },
       { session }
     );
+
+    console.log(
+      chatRoom.users
+        .filter(
+          (user: { toString: () => string }) => user.toString() !== userId
+        )[0]
+        .toString()
+    );
+
+    const reciverId = chatRoom.users
+      .filter(
+        (user: { toString: () => string }) => user.toString() !== userId
+      )[0]
+      .toString();
+
+    const reciver = await UserProfile.findOne({ user: reciverId });
+
+    const socketData = {
+      _id: chatRoom._id,
+      users: [
+        {
+          _id: reciver?.user,
+          profile: {
+            fullName: reciver?.fullName,
+            email: reciver?.email,
+          },
+        },
+      ],
+      createdAt: chatRoom.createdAt,
+      updatedAt: chatRoom.createdAt,
+      __v: 0,
+      lastMessage: [
+        {
+          _id: newMessage[0]._id,
+          roomId: newMessage[0],
+          message: newMessage[0].message,
+          sender: newMessage[0].sender,
+          createdAt: newMessage[0].createdAt,
+          updatedAt: newMessage[0].createdAt,
+          __v: 0,
+        },
+      ],
+    };
+
+    io?.emit(`user-chat-list-${reciverId}`, socketData);
 
     await session.commitTransaction();
     session.endSession();

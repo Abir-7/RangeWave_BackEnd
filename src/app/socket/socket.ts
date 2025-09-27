@@ -15,7 +15,7 @@ interface User {
 
 const connectedUsers = new Map<string, User>();
 
-let io: SocketIOServer | null = null;
+export let io: SocketIOServer | null = null;
 
 export const initSocket = async (httpServer: HttpServer) => {
   io = new SocketIOServer(httpServer, {

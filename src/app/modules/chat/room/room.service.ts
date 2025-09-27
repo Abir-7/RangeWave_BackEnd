@@ -38,6 +38,95 @@ export const createRoomAfterHire = async (
   return newRoom;
 };
 
+// const getChatList = async (userId: string) => {
+//   const data = await ChatRoom.aggregate([
+//     {
+//       $match: { users: new mongoose.Types.ObjectId(userId) },
+//     },
+//     {
+//       $lookup: {
+//         from: "users",
+//         let: { userIds: "$users" },
+//         pipeline: [
+//           { $match: { $expr: { $in: ["$_id", "$$userIds"] } } },
+//           {
+//             $project: { _id: 1 },
+//           },
+//           {
+//             $lookup: {
+//               from: "mechanicprofiles",
+//               let: { userId: "$_id" },
+//               pipeline: [
+//                 { $match: { $expr: { $eq: ["$user", "$$userId"] } } },
+//                 { $project: { fullName: 1, _id: 0, email: 1, image: 1 } },
+//               ],
+//               as: "mechanicProfile",
+//             },
+//           },
+//           {
+//             $lookup: {
+//               from: "userprofiles",
+//               let: { userId: "$_id" },
+//               pipeline: [
+//                 { $match: { $expr: { $eq: ["$user", "$$userId"] } } },
+//                 { $project: { fullName: 1, _id: 0, email: 1, image: 1 } },
+//               ],
+//               as: "userProfile",
+//             },
+//           },
+
+//           {
+//             $unwind: {
+//               path: "$userProfile",
+
+//               preserveNullAndEmptyArrays: true,
+//             },
+//           },
+//           {
+//             $unwind: {
+//               path: "$mechanicProfile",
+//               preserveNullAndEmptyArrays: true,
+//             },
+//           },
+//           {
+//             // Merge profiles into one field "profile"
+//             $addFields: {
+//               profile: {
+//                 $cond: [
+//                   { $ifNull: ["$mechanicProfile", false] },
+//                   "$mechanicProfile",
+//                   "$userProfile",
+//                 ],
+//               },
+//             },
+//           },
+//           {
+//             // Remove the original profile fields after merging
+//             $project: {
+//               userProfile: 0,
+//               mechanicProfile: 0,
+//             },
+//           },
+//         ],
+//         as: "users",
+//       },
+//     },
+//     {
+//       $lookup: {
+//         from: "messages",
+//         localField: "lastMessage",
+//         foreignField: "_id",
+//         as: "lastMessage",
+//       },
+//     },
+//     {
+//       $sort: { updatedAt: -1 },
+//     },
+//   ]);
+
+//   return data;
+// };
+
 const getChatList = async (userId: string) => {
   const data = await ChatRoom.aggregate([
     {
@@ -48,7 +137,16 @@ const getChatList = async (userId: string) => {
         from: "users",
         let: { userIds: "$users" },
         pipeline: [
-          { $match: { $expr: { $in: ["$_id", "$$userIds"] } } },
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $in: ["$_id", "$$userIds"] },
+                  { $ne: ["$_id", new mongoose.Types.ObjectId(userId)] }, // ✅ exclude current user
+                ],
+              },
+            },
+          },
           {
             $project: { _id: 1 },
           },
@@ -74,11 +172,9 @@ const getChatList = async (userId: string) => {
               as: "userProfile",
             },
           },
-
           {
             $unwind: {
               path: "$userProfile",
-
               preserveNullAndEmptyArrays: true,
             },
           },
@@ -89,7 +185,6 @@ const getChatList = async (userId: string) => {
             },
           },
           {
-            // Merge profiles into one field "profile"
             $addFields: {
               profile: {
                 $cond: [
@@ -101,7 +196,6 @@ const getChatList = async (userId: string) => {
             },
           },
           {
-            // Remove the original profile fields after merging
             $project: {
               userProfile: 0,
               mechanicProfile: 0,
