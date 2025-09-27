@@ -48,15 +48,6 @@ const sendMessage = async (
       { session }
     );
 
-    console.log(
-      chatRoom.users
-        .filter(
-          (user: { toString: () => string }) => user.toString() !== userId
-        )[0]
-        .toString(),
-      "reciver--"
-    );
-
     const reciverId = chatRoom.users
       .filter(
         (user: { toString: () => string }) => user.toString() !== userId
@@ -72,10 +63,6 @@ const sendMessage = async (
     } else {
       reciver = await UserProfile.findOne({ user: reciverId });
     }
-    console.log(userId, "sender");
-    console.log(reciver, "reciver");
-
-    console.log(reciverUser, "reciver user");
 
     const socketData = {
       _id: chatRoom._id,
