@@ -74,6 +74,8 @@ const sendMessage = async (
     console.log(userId, "sender");
     console.log(reciver, "reciver");
 
+    console.log(reciverUser, "reciver user");
+
     const socketData = {
       _id: chatRoom._id,
       users: [
