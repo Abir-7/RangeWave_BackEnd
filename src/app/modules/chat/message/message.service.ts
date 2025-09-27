@@ -8,6 +8,8 @@ import Message from "./message.model";
 import mongoose from "mongoose";
 import { io } from "../../../socket/socket";
 import { UserProfile } from "../../users/userProfile/userProfile.model";
+import User from "../../users/user/user.model";
+import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const sendMessage = async (
   userId: string,
@@ -60,7 +62,17 @@ const sendMessage = async (
       )[0]
       .toString();
 
-    const reciver = await UserProfile.findOne({ user: reciverId });
+    const reciverUser = await User.findOne({ user: reciverId });
+
+    let reciver;
+
+    if (reciverUser?.role === "MECHANIC") {
+      reciver = await MechanicProfile.findOne({ user: reciverId });
+    } else {
+      reciver = await UserProfile.findOne({ user: reciverId });
+    }
+
+    console.log(reciver);
 
     const socketData = {
       _id: chatRoom._id,
