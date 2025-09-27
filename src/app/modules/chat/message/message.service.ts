@@ -81,7 +81,7 @@ const sendMessage = async (
       lastMessage: [
         {
           _id: newMessage[0]._id,
-          roomId: newMessage[0].roomId.roomId,
+          roomId: newMessage[0].roomId,
           message: newMessage[0].message,
           sender: newMessage[0].sender,
           createdAt: newMessage[0].createdAt,
@@ -91,7 +91,7 @@ const sendMessage = async (
       ],
     };
 
-    console.log(socketData);
+    console.dir(socketData, { depth: null });
 
     io?.emit(`user-chat-list-${reciverId}`, socketData);
 
