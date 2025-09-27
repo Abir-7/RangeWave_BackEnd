@@ -53,7 +53,8 @@ const sendMessage = async (
         .filter(
           (user: { toString: () => string }) => user.toString() !== userId
         )[0]
-        .toString()
+        .toString(),
+      "reciver--"
     );
 
     const reciverId = chatRoom.users
