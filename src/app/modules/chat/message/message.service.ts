@@ -61,8 +61,8 @@ const sendMessage = async (
         (user: { toString: () => string }) => user.toString() !== userId
       )[0]
       .toString();
-
-    const reciverUser = await User.findOne({ user: reciverId });
+    console.log(userId);
+    const reciverUser = await User.findOne({ user: reciverId._id });
 
     let reciver;
 
