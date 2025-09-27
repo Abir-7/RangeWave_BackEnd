@@ -80,8 +80,8 @@ const sendMessage = async (
         {
           _id: reciver?.user,
           profile: {
-            fullName: reciver?.fullName,
-            email: reciver?.email,
+            fullName: reciver?.fullName || "",
+            email: reciver?.email || "",
           },
         },
       ],
