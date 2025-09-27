@@ -91,6 +91,8 @@ const sendMessage = async (
       ],
     };
 
+    console.log(socketData);
+
     io?.emit(`user-chat-list-${reciverId}`, socketData);
 
     await session.commitTransaction();
