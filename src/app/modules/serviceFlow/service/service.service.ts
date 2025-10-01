@@ -3,7 +3,7 @@ import { createRoomAfterHire } from "./../../chat/room/room.service";
 import { status } from "http-status";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import mongoose, { model, PipelineStage } from "mongoose";
+import mongoose, { model, PipelineStage, Types } from "mongoose";
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { Service } from "./service.model";
 import { IService, IsServiceCompleted, Status } from "./service.interface";
@@ -890,28 +890,66 @@ const changeServiceStatus = async (
 };
 
 const seeServiceDetails = async (sId: string) => {
-  const service = await Service.findById(sId)
-    .populate({
-      path: "user",
-      model: "UserProfile",
-      foreignField: "user",
-      select: " fullName image -_id ",
-      populate: {
-        path: "user",
-        model: "User",
-        foreignField: "_id",
-        select: " -authentication  -needToResetPass -needToUpdateProfile -__v ",
+  const service = await Service.aggregate([
+    {
+      $match: {
+        _id: new Types.ObjectId(sId),
       },
-    })
-    .lean();
-  if (!service) {
+    },
+    // Lookup for UserProfile
+    {
+      $lookup: {
+        from: "userprofiles",
+        localField: "user",
+        foreignField: "user",
+        as: "userProfile",
+      },
+    },
+    { $unwind: { path: "$userProfile", preserveNullAndEmptyArrays: true } },
+
+    // Lookup inside UserProfile → User
+    {
+      $lookup: {
+        from: "users",
+        localField: "userProfile.user",
+        foreignField: "_id",
+        as: "userProfile.user",
+      },
+    },
+    {
+      $unwind: { path: "$userProfile.user", preserveNullAndEmptyArrays: true },
+    },
+
+    // Project only required fields (✅ no mix of inclusion + exclusion)
+    {
+      $project: {
+        issue: 1,
+        description: 1,
+        schedule: 1,
+        //price: 1,
+        "location.placeId": 1,
+        "location.coordinates.coordinates": 1,
+        "userProfile.fullName": 1,
+        "userProfile.image": 1,
+        // only keep the safe fields you want
+        "userProfile.user._id": 1,
+        "userProfile.user.email": 1,
+        "userProfile.user.role": 1,
+      },
+    },
+  ]);
+
+  if (!service || service.length === 0) {
     throw new Error("Service not found");
   }
+
+  const result = service[0];
+
   return {
-    ...service,
+    ...result,
     location: {
-      placeId: service.location.placeId,
-      coordinates: service.location.coordinates.coordinates,
+      placeId: result.location.placeId,
+      coordinates: result.location.coordinates.coordinates,
     },
   };
 };
