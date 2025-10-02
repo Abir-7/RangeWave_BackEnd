@@ -935,6 +935,7 @@ const seeServiceDetails = async (sId: string) => {
         "userProfile.user._id": 1,
         "userProfile.user.email": 1,
         "userProfile.user.role": 1,
+        "userProfile.carInfo": 1,
       },
     },
   ]);
