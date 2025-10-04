@@ -425,7 +425,8 @@ const getRunningService = async (userId: string) => {
       path: "mechanicProfile",
       select: "-workshop -experience -certificates -createdAt -updatedAt -__v",
     })
-    .select("-id -__v -createdAt -updatedAt");
+    .select("-id -__v  -updatedAt ")
+    .sort({ createdAt: -1 });
 
   if (!payments.length) {
     return [];
