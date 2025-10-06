@@ -49,7 +49,7 @@ const findCarIssues = async (searchTerm: string = "", limit: number = 25) => {
       .limit(limit)
       .exec();
 
-    return issues;
+    return issues.map((issue) => issue.name);
   } catch (error) {
     console.error("❌ Error finding car issues:", error);
     throw error;
