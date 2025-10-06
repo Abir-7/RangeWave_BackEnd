@@ -12,7 +12,6 @@ export async function seedCarIssue() {
     const data = issues.car_issues.map((issue: any) => ({ name: issue }));
     await CarIssue.insertMany(data);
     logger.info("Car issue seeded.");
-    process.exit(0);
   } catch (err) {
     logger.error("❌ Error seeding car issues:", err);
     process.exit(1);
