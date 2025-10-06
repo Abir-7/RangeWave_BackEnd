@@ -1,13 +1,19 @@
 import { Router } from "express";
 import { ServiceController } from "./service.controller";
 import { auth } from "../../../middleware/auth/auth";
-import { getCarsData } from "../../carModel/carModel.controller.service";
+import {
+  getCarsData,
+  getCarsIssue,
+} from "../../carModel/carModel.controller.service";
 
 const router = Router();
 
 //-------------------------------------for user only
 
 router.post("/req-for-help", auth("USER"), ServiceController.addServiceReq);
+
+router.get("/find-car", getCarsData);
+router.get("/find-issue", getCarsIssue);
 
 router.get(
   "/list-of-bid/:sId",
@@ -83,7 +89,5 @@ router.get(
   auth("USER"),
   ServiceController.addNewBidDataToService
 );
-
-router.get("/find-car", getCarsData);
 
 export const ServiceRoute = router;
