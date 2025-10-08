@@ -6,26 +6,35 @@ import {
   IWorkingHour,
 } from "./mechanicProfile.interface";
 
-const WorkingHourSchema = new Schema<IWorkingHour>({
-  start: { type: String },
-  end: { type: String },
-});
+const WorkingHourSchema = new Schema<IWorkingHour>(
+  {
+    start: { type: String },
+    end: { type: String },
+  },
+  { _id: false }
+);
 
-const CertificateSchema = new Schema<ICertificate>({
-  institutionName: { type: String },
-  startTime: { type: String },
-  endTime: { type: String },
-});
+const CertificateSchema = new Schema<ICertificate>(
+  {
+    institutionName: { type: String },
+    startTime: { type: String },
+    endTime: { type: String },
+  },
+  { _id: false }
+);
 
-const LocationSchema = new Schema<ILocation>({
-  apartmentNo: { type: String },
-  roadNo: { type: String },
-  state: { type: String },
-  city: { type: String },
-  zipCode: { type: String },
-  address: { type: String },
-  country: { type: String },
-});
+const LocationSchema = new Schema<ILocation>(
+  {
+    apartmentNo: { type: String },
+    roadNo: { type: String },
+    state: { type: String },
+    city: { type: String },
+    zipCode: { type: String },
+    address: { type: String },
+    country: { type: String },
+  },
+  { _id: false }
+);
 
 const MechanicProfileSchema = new Schema<IMechanicProfile>(
   {
@@ -37,6 +46,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     user: { type: Schema.Types.ObjectId, ref: "User" },
     stripeAccountId: { type: String },
     workshop: {
+      _id: false,
       name: { type: String },
       workingHours: { type: WorkingHourSchema, default: {} },
       services: [{ type: String }],
@@ -54,7 +64,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
         },
       },
     },
-    experience: [{ type: String }],
+    experience: [{ type: String, _id: false }],
     certificates: [CertificateSchema],
     isNeedToPayForWorkShop: { type: Boolean, default: false },
   },

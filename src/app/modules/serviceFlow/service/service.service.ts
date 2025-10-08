@@ -22,6 +22,7 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
 import { TUserRole } from "../../../interface/auth.interface";
+import ChatRoom from "../../chat/room/room.model";
 
 //------------------------for users--------------------------//
 
@@ -111,7 +112,7 @@ const checkServiceStatusFinding = async (userId: string) => {
   const services = await Service.find({
     user: userId,
     status: Status.FINDING,
-  });
+  }).sort({ createdAt: -1 });
 
   const immediateService = services.filter((s) => !s.schedule?.isSchedule);
   const scheduledService = services.filter((s) => s.schedule?.isSchedule);
@@ -213,25 +214,25 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
   ]);
 
   // Step 5: Add distance in Node.js (still more efficient this way)
-  return bids.map(
-    (bid: { location: { coordinates: { coordinates: any } } }) => {
-      const coords = bid.location?.coordinates?.coordinates;
+  return bids.map((bid: any) => {
+    // const coords = bid.location?.coordinates?.coordinates;
+    const coords = bid.mechanicProfile?.workshop?.location?.coordinates;
 
-      const distance = coords
+    const distance =
+      coords.length > 1
         ? calculateDistance(
             service.location.coordinates.coordinates as [number, number],
             coords
           )
         : null;
 
-      return {
-        ...bid,
+    return {
+      ...bid,
 
-        distance:
-          distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
-      };
-    }
-  );
+      distance:
+        distance || distance === 0 ? parseFloat(distance.toFixed(2)) : null,
+    };
+  });
 };
 
 const hireMechanic = async (data: { bidId: string }, userId: string) => {
@@ -415,7 +416,8 @@ const getRunningService = async (userId: string) => {
     .populate({ path: "bidId", select: "price status extraWork location" })
     .populate({
       path: "serviceId",
-      select: "description status isServiceCompleted issue schedule location",
+      select:
+        "description status isServiceCompleted issue schedule location updatedAt",
     })
     .populate({
       path: "userProfile",
@@ -426,12 +428,12 @@ const getRunningService = async (userId: string) => {
       select: "-workshop -experience -certificates -createdAt -updatedAt -__v",
     })
     .select("-id -__v  -updatedAt ")
-    .sort({ createdAt: -1 });
+    .sort({ updatedAt: -1 });
 
   if (!payments.length) {
     return [];
   }
-
+  console.log(payments);
   return payments;
 };
 
@@ -514,11 +516,15 @@ const seeCurrentServiceProgress = async (pId: string) => {
     .select("-id -__v -createdAt -updatedAt")
     .lean();
 
+  const chatRoom = await ChatRoom.findOne({
+    users: { $all: [serviceData?.mechanicId._id, serviceData?.user._id] }, // both users must be in the array
+  }).populate("lastMessage");
+
   if (!serviceData) {
     throw new AppError(status.NOT_FOUND, "No data found.");
   }
 
-  return serviceData;
+  return { ...serviceData, chatId: chatRoom?._id || "" };
 };
 
 //-------------------------------mechanic-------------------------------------------
@@ -788,17 +794,22 @@ const getAllRequestedService = async (
         mechanicBid: 0,
       },
     },
-  ];
+    { $sort: { createdAt: -1 } },
+  ] as any;
+
+  const mechanicData = await MechanicProfile.findOne({ user: mechanicId });
 
   const data = await Service.aggregate(aggregateArray);
 
+  const workshopLocation = mechanicData?.workshop?.location?.coordinates
+    ?.coordinates as [number, number];
   // Add distance
   const enriched = data.map((service: any) => ({
     ...service,
-    distanceKm: calculateDistance(
-      mechanicCoordinate,
-      service.location.coordinates
-    ),
+    distanceKm:
+      workshopLocation.length > 1
+        ? calculateDistance(workshopLocation, service.location.coordinates)
+        : 0,
   }));
 
   return enriched;

@@ -107,7 +107,10 @@ const createPaymentIntent = async (pId: string) => {
     throw new AppError(status.NOT_FOUND, "Mechanic profile not found.");
   }
   if (!mechanicData.stripeAccountId) {
-    throw new AppError(status.NOT_FOUND, "Mechanic stripe account not found.");
+    throw new AppError(
+      status.NOT_FOUND,
+      "Mechanic have to create and connect stripe account with app from profile."
+    );
   }
 
   // If already created, return client_secret if still pending

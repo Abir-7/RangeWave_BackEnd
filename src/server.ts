@@ -54,5 +54,4 @@ const main = async () => {
     }
   );
 };
-
 main().catch((err) => logger.error("Error connecting to MongoDB:", err));
