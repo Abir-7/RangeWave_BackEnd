@@ -498,7 +498,7 @@ const cancelService = async (
     throw error;
   }
 };
-const seeCurrentServiceProgress = async (pId: string) => {
+const seeCurrentServiceProgress = async (pId: string, userId: string) => {
   const serviceData = await Payment.findOne({ _id: pId })
     .populate({ path: "bidId", select: "price status extraWork location" })
     .populate({
@@ -518,7 +518,7 @@ const seeCurrentServiceProgress = async (pId: string) => {
 
   const chatRoom = await ChatRoom.findOne({
     users: { $all: [serviceData?.mechanicId._id, serviceData?.user._id] }, // both users must be in the array
-  }).populate("lastMessage");
+  });
 
   if (!serviceData) {
     throw new AppError(status.NOT_FOUND, "No data found.");

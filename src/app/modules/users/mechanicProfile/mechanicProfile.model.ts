@@ -41,7 +41,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     fullName: { type: String },
     email: { type: String },
     location: { type: LocationSchema, default: {} },
-    phoneNumber: { type: String },
+    phoneNumber: { type: String, default: "" },
     image: { type: String },
     user: { type: Schema.Types.ObjectId, ref: "User" },
     stripeAccountId: { type: String },

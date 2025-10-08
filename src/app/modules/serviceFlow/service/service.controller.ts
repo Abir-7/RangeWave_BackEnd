@@ -85,7 +85,8 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
 const seeCurrentServiceProgress = catchAsync(
   async (req: Request, res: Response) => {
     const result = await ServiceService.seeCurrentServiceProgress(
-      req.params.pId
+      req.params.pId,
+      req.user.userId
     );
     sendResponse(res, {
       success: true,
