@@ -646,7 +646,7 @@ const seeCurrentServiceProgress = async (
   if (!serviceData) {
     throw new AppError(status.NOT_FOUND, "No data found.");
   }
-  let avgRating;
+  let avgRating = 0;
   if (userRoleData === "MECHANIC") {
     const avgResult = await UserRating.aggregate([
       { $match: { user: new mongoose.Types.ObjectId(serviceData.user) } },
@@ -667,7 +667,11 @@ const seeCurrentServiceProgress = async (
     avgRating = avgResult[0]?.averageRating || 0;
   }
 
-  return { ...serviceData, chatId: chatRoom?._id || "", avgRating };
+  return {
+    ...serviceData,
+    chatId: chatRoom?._id || "",
+    avgRating: avgRating.toFixed(2),
+  };
 };
 
 //-------------------------------mechanic-------------------------------------------
