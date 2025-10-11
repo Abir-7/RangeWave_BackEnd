@@ -25,6 +25,8 @@ import { TUserRole } from "../../../interface/auth.interface";
 import ChatRoom from "../../chat/room/room.model";
 import { UserCarIssue } from "../../carIssue/carIssuse.model";
 import logger from "../../../utils/logger";
+import UserRating from "../../rating/userRating/userRating.model";
+import MechanicRating from "../../rating/mechanicRating/mechanicRating.model";
 
 //------------------------for users--------------------------//
 
@@ -130,6 +132,8 @@ const addServiceReq = async (
   },
   userId: string
 ): Promise<IService> => {
+  console.log(userId);
+
   const location = {
     placeId: serviceData.location.placeId,
     coordinates: {
@@ -557,7 +561,7 @@ const cancelService = async (
   pId: string,
   serviceData: { cancelReson: string },
   userId: string,
-  userRole: TUserRole
+  userRoleDAta: TUserRole
 ): Promise<IService> => {
   const session = await mongoose.startSession();
   console.log(pId, "ssss", userId);
@@ -588,7 +592,7 @@ const cancelService = async (
     paymentData.status = PaymentStatus.CANCELLED;
     await paymentData.save({ session });
 
-    const isMechanic = userRole === "MECHANIC";
+    const isMechanic = userRoleDAta === "MECHANIC";
 
     const io = getSocket();
 
@@ -614,7 +618,10 @@ const cancelService = async (
     throw error;
   }
 };
-const seeCurrentServiceProgress = async (pId: string, userId: string) => {
+const seeCurrentServiceProgress = async (
+  pId: string,
+  userRoleData: TUserRole
+) => {
   const serviceData = await Payment.findOne({ _id: pId })
     .populate({ path: "bidId", select: "price status extraWork location" })
     .populate({
@@ -639,8 +646,28 @@ const seeCurrentServiceProgress = async (pId: string, userId: string) => {
   if (!serviceData) {
     throw new AppError(status.NOT_FOUND, "No data found.");
   }
+  let avgRating;
+  if (userRoleData === "MECHANIC") {
+    const avgResult = await UserRating.aggregate([
+      { $match: { user: new mongoose.Types.ObjectId(serviceData.user) } },
+      { $group: { _id: null, averageRating: { $avg: "$rating" } } },
+    ]);
+    avgRating = avgResult[0]?.averageRating || 0;
+  }
 
-  return { ...serviceData, chatId: chatRoom?._id || "" };
+  if (userRoleData === "USER") {
+    const avgResult = await MechanicRating.aggregate([
+      {
+        $match: {
+          mechanicId: new mongoose.Types.ObjectId(serviceData.mechanicId),
+        },
+      },
+      { $group: { _id: null, averageRating: { $avg: "$rating" } } },
+    ]);
+    avgRating = avgResult[0]?.averageRating || 0;
+  }
+
+  return { ...serviceData, chatId: chatRoom?._id || "", avgRating };
 };
 
 //-------------------------------mechanic-------------------------------------------
@@ -882,7 +909,7 @@ const getAllRequestedService = async (
       $lookup: {
         from: "userratings",
         let: { userId: { $arrayElemAt: ["$profileData.user", 0] } },
-        pipeline: [{ $match: { $expr: { $eq: ["$mechanicId", "$$userId"] } } }],
+        pipeline: [{ $match: { $expr: { $eq: ["$user", "$$userId"] } } }],
         as: "userRatings",
       },
     },
