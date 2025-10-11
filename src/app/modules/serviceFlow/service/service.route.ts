@@ -13,7 +13,7 @@ const router = Router();
 router.post("/req-for-help", auth("USER"), ServiceController.addServiceReq);
 
 router.get("/find-car", getCarsData);
-router.get("/find-issue", getCarsIssue);
+router.get("/find-issue", auth("USER"), getCarsIssue);
 
 router.get(
   "/list-of-bid/:sId",
