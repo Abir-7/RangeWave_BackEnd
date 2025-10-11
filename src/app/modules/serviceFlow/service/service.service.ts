@@ -670,7 +670,7 @@ const seeCurrentServiceProgress = async (
   return {
     ...serviceData,
     chatId: chatRoom?._id || "",
-    avgRating: avgRating.toFixed(2),
+    avgRating: Number(avgRating.toFixed(2)),
   };
 };
 
