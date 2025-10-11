@@ -23,12 +23,102 @@ import { BidStatus } from "../bid/bid.interface";
 import { Bid } from "../bid/bid.model";
 import { TUserRole } from "../../../interface/auth.interface";
 import ChatRoom from "../../chat/room/room.model";
+import { UserCarIssue } from "../../carIssue/carIssuse.model";
+import logger from "../../../utils/logger";
 
 //------------------------for users--------------------------//
+
+// const addServiceReq = async (
+//   serviceData: {
+//     issue: string;
+//     isNew: boolean;
+//     description: string;
+//     location: {
+//       placeId: string;
+//       coordinates: number[];
+//     };
+//     schedule?: {
+//       date: Date;
+//     };
+//   },
+//   userId: string
+// ): Promise<IService> => {
+//   const location = {
+//     placeId: serviceData.location.placeId,
+//     coordinates: {
+//       type: "Point",
+//       coordinates: serviceData.location.coordinates,
+//     },
+//   };
+
+//   const today = new Date();
+//   // Set time range for today (start and end)
+//   const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+//   const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+//   const isScheduled = !!serviceData.schedule?.date;
+
+//   // 1. If this is a scheduled request, check if there's already a scheduled service today
+//   // if (isScheduled) {
+//   //   const existingScheduled = await Service.findOne({
+//   //     user: userId,
+//   //     status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+//   //     "schedule.isSchedule": true,
+//   //     createdAt: { $gte: startOfDay, $lte: endOfDay },
+//   //   });
+
+//   //   if (existingScheduled) {
+//   //     throw new Error("You already have a scheduled service request today.");
+//   //   }
+//   // }
+//   // // 2. If this is an unscheduled request, check if there's already an unscheduled service today
+//   // else {
+//   //   const existingUnscheduled = await Service.findOne({
+//   //     user: userId,
+//   //     status: { $in: [Status.FINDING, Status.WORKING, Status.WAITING] },
+//   //     "schedule.isSchedule": false,
+//   //     createdAt: { $gte: startOfDay, $lte: endOfDay },
+//   //   });
+
+//   //   if (existingUnscheduled) {
+//   //     throw new Error("You already have an unscheduled service request today.");
+//   //   }
+//   // }
+
+//   // If no conflict, create the new service
+
+//   const service = await Service.create({
+//     issue: serviceData.issue,
+//     description: serviceData.description,
+//     user: userId,
+//     location,
+//     ...(isScheduled
+//       ? {
+//           schedule: {
+//             isSchedule: true,
+//             date: serviceData.schedule!.date,
+//           },
+//         }
+//       : {
+//           // For unscheduled, rely on default: { isSchedule: false, date: null }
+//         }),
+//   });
+
+//   if (serviceData.isNew) {
+//     await UserCarIssue.create({ name: serviceData.issue, user: userId });
+//   }
+
+//   const io = getSocket();
+//   // socket-emit
+//   io.emit("new-service", { serviceId: service._id });
+
+//   return service;
+// };
 
 const addServiceReq = async (
   serviceData: {
     issue: string;
+    isNew: boolean;
     description: string;
     location: {
       placeId: string;
@@ -84,28 +174,54 @@ const addServiceReq = async (
 
   // If no conflict, create the new service
 
-  const service = await Service.create({
-    issue: serviceData.issue,
-    description: serviceData.description,
-    user: userId,
-    location,
-    ...(isScheduled
-      ? {
-          schedule: {
-            isSchedule: true,
-            date: serviceData.schedule!.date,
+  const session = await mongoose.startSession();
+
+  let service: any;
+
+  try {
+    await session.withTransaction(async () => {
+      service = await Service.create(
+        [
+          {
+            issue: serviceData.issue,
+            description: serviceData.description,
+            user: userId,
+            location,
+            ...(isScheduled
+              ? {
+                  schedule: {
+                    isSchedule: true,
+                    date: serviceData.schedule!.date,
+                  },
+                }
+              : {
+                  // For unscheduled, rely on default: { isSchedule: false, date: null }
+                }),
           },
-        }
-      : {
-          // For unscheduled, rely on default: { isSchedule: false, date: null }
-        }),
-  });
+        ],
+        { session }
+      );
 
-  const io = getSocket();
-  // socket-emit
-  io.emit("new-service", { serviceId: service._id });
+      if (serviceData.isNew) {
+        await UserCarIssue.create([{ name: serviceData.issue, user: userId }], {
+          session,
+        });
+      }
+    });
 
-  return service;
+    const io = getSocket();
+    // socket-emit
+    if (service && service[0]) {
+      io.emit("new-service", { serviceId: service[0]._id });
+    }
+
+    return service[0];
+  } catch (error) {
+    logger.error("❌ Error creating service:", error);
+    throw error;
+  } finally {
+    await session.endSession();
+  }
 };
 
 const checkServiceStatusFinding = async (userId: string) => {
