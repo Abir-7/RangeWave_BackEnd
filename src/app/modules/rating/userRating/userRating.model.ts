@@ -16,6 +16,9 @@ const userRatingSchema = new Schema<IUserRating>(
       ref: "User",
       required: true,
     },
+    text: {
+      type: String,
+    },
     user: {
       type: Schema.Types.ObjectId,
       ref: "User",

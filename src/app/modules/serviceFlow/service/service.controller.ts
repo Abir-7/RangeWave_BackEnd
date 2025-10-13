@@ -70,6 +70,32 @@ const markServiceAsComplete = catchAsync(
   }
 );
 
+const mechanicDetails = catchAsync(async (req: Request, res: Response) => {
+  const { mechanicId } = req.params;
+
+  const result = await ServiceService.mechanicDetails(mechanicId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Mechanic details fetched.",
+    data: result,
+  });
+});
+
+const getMechanicRatings = catchAsync(async (req: Request, res: Response) => {
+  const { mechanicId } = req.params;
+
+  const result = await ServiceService.getMechanicRatings(mechanicId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "Mechanic rating details fetched.",
+    data: result,
+  });
+});
+
 //---------------------------- For Both Mechanics and Users-----------------------------//
 
 const getRunningService = catchAsync(async (req: Request, res: Response) => {
@@ -115,14 +141,26 @@ const cancelService = catchAsync(async (req: Request, res: Response) => {
 });
 //--------------------------------- For Mechanics -----------------------------------------//
 
+const getUserRatings = catchAsync(async (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  const result = await ServiceService.getUserRatings(userId);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: 200,
+    message: "User rating details fetched.",
+    data: result,
+  });
+});
+
 const getAllRequestedService = catchAsync(
   async (req: Request, res: Response) => {
-    console.time();
     const result = await ServiceService.getAllRequestedService(
       req.user.userId,
       req.body.coordinate
     );
-    console.timeEnd();
+
     sendResponse(res, {
       success: true,
       statusCode: 200,
@@ -194,7 +232,7 @@ export const ServiceController = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
-
+  getMechanicRatings,
   cancelService,
 
   seeServiceDetails,
@@ -204,7 +242,9 @@ export const ServiceController = {
   getAllRequestedService,
 
   pushNewServiceReq,
+  getUserRatings,
   addNewBidDataToService,
   changeServiceStatus,
   markServiceAsComplete,
+  mechanicDetails,
 };

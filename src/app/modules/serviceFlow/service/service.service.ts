@@ -516,6 +516,106 @@ const markServiceAsComplete = async (pId: string, paymentType: PaymentType) => {
     };
   }
 };
+
+const mechanicDetails = async (m_id: string) => {
+  const mechanic = await MechanicProfile.findOne({ user: m_id })
+    .select("-createdAt -updatedAt -isNeedToPayForWorkShop")
+    .populate("user", "email role")
+    .lean();
+
+  const result = await MechanicRating.aggregate([
+    {
+      $match: { mechanicId: new mongoose.Types.ObjectId(m_id) },
+    },
+    {
+      $group: {
+        _id: "$mechanicId",
+        averageRating: { $avg: "$rating" },
+        totalRatings: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const totalServiceDone = await Payment.countDocuments({
+    mechanicId: new mongoose.Types.ObjectId(m_id),
+    status: PaymentStatus.PAID,
+  });
+
+  const data = result[0] || {
+    averageRating: 0,
+    totalRatings: 0,
+  };
+
+  return { ...mechanic, ...data, totalServiceDone };
+};
+
+export const getMechanicRatings = async (mechanicId: string) => {
+  const ratings = await MechanicRating.aggregate([
+    {
+      $match: {
+        mechanicId: new mongoose.Types.ObjectId(mechanicId),
+      },
+    },
+    {
+      $lookup: {
+        from: "userprofiles", // must match the actual Mongo collection name
+        localField: "user", // from MechanicRating
+        foreignField: "user", // from UserProfile
+        as: "userProfile",
+      },
+    },
+    {
+      $unwind: {
+        path: "$userProfile",
+        preserveNullAndEmptyArrays: true, // in case userProfile missing
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        rating: 1,
+        text: 1,
+        name: "$userProfile.fullName",
+      },
+    },
+  ]);
+
+  return ratings;
+};
+const getUserRatings = async (userId: string) => {
+  const ratings = await UserRating.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $lookup: {
+        from: "mechanicprofiles", // must match the actual Mongo collection name
+        localField: "mechanicId", // from MechanicRating
+        foreignField: "user", // from UserProfile
+        as: "mechanicProfile",
+      },
+    },
+    {
+      $unwind: {
+        path: "$mechanicProfile",
+        preserveNullAndEmptyArrays: true, // in case userProfile missing
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        rating: 1,
+        text: 1,
+        name: "$mechanicProfile.fullName",
+      },
+    },
+  ]);
+
+  return ratings;
+};
+
 //-----------------------common----------------------------
 const getRunningService = async (userId: string) => {
   const userData = await User.findById(userId).lean();
@@ -1104,13 +1204,39 @@ const seeServiceDetails = async (sId: string) => {
   }
 
   const result = service[0];
+  let userRating;
 
+  if (result && result.userProfile.user._id) {
+    console.log(result.userProfile.user._id);
+    const ratingData = await UserRating.aggregate([
+      {
+        $match: {
+          user: new mongoose.Types.ObjectId(
+            String(result.userProfile.user._id) as string
+          ),
+        },
+      },
+      {
+        $group: {
+          _id: "$user",
+          averageRating: { $avg: "$rating" },
+          totalRatings: { $sum: 1 },
+        },
+      },
+    ]);
+    userRating = ratingData[0] || {
+      averageRating: 0,
+      totalRatings: 0,
+    };
+  }
+  console.log(userRating);
   return {
     ...result,
     location: {
       placeId: result.location.placeId,
       coordinates: result.location.coordinates.coordinates,
     },
+    userRating: userRating,
   };
 };
 
@@ -1261,7 +1387,8 @@ export const ServiceService = {
   checkServiceStatusFinding,
   getBidListOfService,
   hireMechanic,
-
+  mechanicDetails,
+  getMechanicRatings,
   cancelService,
   seeServiceDetails,
 
@@ -1272,6 +1399,7 @@ export const ServiceService = {
   addNewBidDataToService,
   changeServiceStatus,
   markServiceAsComplete,
+  getUserRatings,
 };
 
 //helper function

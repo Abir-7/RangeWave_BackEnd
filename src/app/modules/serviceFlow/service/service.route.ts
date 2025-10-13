@@ -16,6 +16,16 @@ router.get("/find-car", getCarsData);
 router.get("/find-issue", auth("USER"), getCarsIssue);
 
 router.get(
+  "/mechanic_details/:mechanicId",
+  auth("USER"),
+  ServiceController.mechanicDetails
+);
+router.get(
+  "/mechanic_ratings/:mechanicId",
+  auth("USER"),
+  ServiceController.getMechanicRatings
+);
+router.get(
   "/list-of-bid/:sId",
   auth("USER"),
   ServiceController.getBidListOfService
@@ -40,6 +50,12 @@ router.post(
   "/get-requested-service-list",
   auth("MECHANIC"),
   ServiceController.getAllRequestedService
+);
+
+router.get(
+  "/user_ratings/:userId",
+  // auth("MECHANIC"),
+  ServiceController.getUserRatings
 );
 
 router.get(

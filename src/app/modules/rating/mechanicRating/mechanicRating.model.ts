@@ -10,6 +10,9 @@ const mechanicRatingSchema = new Schema<IMechanicRating>(
       min: 1,
       max: 5,
     },
+    text: {
+      type: String,
+    },
     mechanicId: {
       type: Schema.Types.ObjectId,
       ref: "User",
