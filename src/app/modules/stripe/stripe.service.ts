@@ -109,7 +109,7 @@ const createPaymentIntent = async (pId: string) => {
   if (!mechanicData.stripeAccountId) {
     throw new AppError(
       status.NOT_FOUND,
-      "Mechanic have to create and connect stripe account with app from profile."
+      "Mechanic have to create and connect stripe account with app from profile section."
     );
   }
 
