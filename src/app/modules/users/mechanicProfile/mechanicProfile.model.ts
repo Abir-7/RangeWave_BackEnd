@@ -44,7 +44,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     phoneNumber: { type: String, default: "" },
     image: { type: String },
     user: { type: Schema.Types.ObjectId, ref: "User" },
-    stripeAccountId: { type: String },
+    stripeAccountId: { type: String, default: "" },
     workshop: {
       _id: false,
       name: { type: String },
@@ -67,6 +67,7 @@ const MechanicProfileSchema = new Schema<IMechanicProfile>(
     experience: [{ type: String, _id: false }],
     certificates: [CertificateSchema],
     isNeedToPayForWorkShop: { type: Boolean, default: false },
+    isStripeActive: { type: Boolean, default: false },
   },
   {
     timestamps: true,

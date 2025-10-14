@@ -6,7 +6,7 @@ import AppError from "../../errors/AppError";
 import { MechanicProfile } from "../users/mechanicProfile/mechanicProfile.model";
 
 import { stripe } from "./stripe";
-import { decrypt, encrypt } from "../../utils/helper/encrypt&decrypt";
+
 import { appConfig } from "../../config";
 
 import Payment from "./payment.model";
@@ -39,7 +39,7 @@ const createAndConnect = async (mechanicEmail: string) => {
 
   // Step 2: Check if Stripe account already exists
   if (mechanicProfile.stripeAccountId) {
-    stripeAccountId = decrypt(mechanicProfile.stripeAccountId);
+    stripeAccountId = mechanicProfile.stripeAccountId;
   } else {
     // Step 3: Create new Stripe account if not found
     const account = await stripe.accounts.create({
@@ -54,7 +54,7 @@ const createAndConnect = async (mechanicEmail: string) => {
 
     // Step 4: Save new Stripe account ID to mechanic profile
     stripeAccountId = account.id;
-    mechanicProfile.stripeAccountId = encrypt(account.id);
+    mechanicProfile.stripeAccountId = account.id;
     await mechanicProfile.save();
   }
 
@@ -67,18 +67,16 @@ const createAndConnect = async (mechanicEmail: string) => {
     collect: "eventually_due", // optional: ensures missing info is collected
   });
 
-  const account = await stripe.accounts.retrieve(stripeAccountId);
-  let isAccountActive = false;
-  if (!account.charges_enabled || !account.payouts_enabled) {
-    isAccountActive = false;
-  } else {
-    isAccountActive = true;
-  }
+  // if (!account.charges_enabled || !account.payouts_enabled) {
+  //   isAccountActive = false;
+  // } else {
+  //   isAccountActive = true;
+  // }
 
   return {
     url: accountLink.url,
     accountId: stripeAccountId,
-    isAccountActive,
+    isAccountActive: mechanicProfile.isStripeActive,
   };
 };
 
@@ -153,7 +151,7 @@ const createPaymentIntent = async (pId: string) => {
   }
 
   const connectedAccount = await stripe.accounts.retrieve(
-    decrypt(mechanicData.stripeAccountId)
+    mechanicData.stripeAccountId
   );
   if (!connectedAccount || (connectedAccount as any).deleted) {
     throw new AppError(status.NOT_FOUND, "Invalid connected account.");
@@ -165,7 +163,7 @@ const createPaymentIntent = async (pId: string) => {
     customer: stripeCustomerId,
     automatic_payment_methods: { enabled: true },
     transfer_data: {
-      destination: decrypt(mechanicData.stripeAccountId),
+      destination: mechanicData.stripeAccountId,
     },
     metadata: {
       bidId: String(paymentData.bidId),
@@ -282,6 +280,32 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
 
       break;
     }
+    // case "account.updated": {
+    //   console.log("hit");
+    //   const account = event.data.object; // Stripe.Account
+    //   const stripeAccountId = account.id; // e.g. acct_1QWxyzABC
+
+    //   // Find mechanic by their connected Stripe account
+    //   const mechanicProfile = await MechanicProfile.findOne({
+    //     stripeAccountId,
+    //   });
+
+    //   // Check if their account is fully active
+    //   if (account.charges_enabled && account.payouts_enabled) {
+    //     if (mechanicProfile) {
+    //       mechanicProfile.isStripeActive = true;
+    //       await mechanicProfile.save();
+    //     }
+    //   } else {
+    //     // Optional: handle case where account becomes inactive
+    //     if (mechanicProfile) {
+    //       mechanicProfile.isStripeActive = false;
+    //       await mechanicProfile.save();
+    //     }
+    //   }
+
+    //   break;
+    // }
 
     case "payment_intent.payment_failed":
     case "payment_intent.canceled": {

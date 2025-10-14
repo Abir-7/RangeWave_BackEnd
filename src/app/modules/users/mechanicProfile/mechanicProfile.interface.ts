@@ -33,6 +33,7 @@ export interface IMechanicProfile {
   experience: string[];
   certificates: ICertificate[];
   isNeedToPayForWorkShop: boolean;
+  isStripeActive: boolean;
 }
 
 export interface IWorkshop {
