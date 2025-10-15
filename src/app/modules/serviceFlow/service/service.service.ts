@@ -577,13 +577,19 @@ export const getMechanicRatings = async (mechanicId: string) => {
         rating: 1,
         text: 1,
         name: "$userProfile.fullName",
+        createdAt: 1,
       },
     },
     {
-      $sort: { createdAt: -1 }, // newest first
+      $sort: {
+        createdAt: -1,
+      }, // newest first
     },
   ]);
 
+  console.log(ratings);
+
+  console.log("object33");
   return ratings;
 };
 const getUserRatings = async (userId: string) => {
@@ -613,13 +619,14 @@ const getUserRatings = async (userId: string) => {
         rating: 1,
         text: 1,
         name: "$mechanicProfile.fullName",
+        createdAt: 1,
       },
     },
     {
       $sort: { createdAt: -1 }, // newest first
     },
   ]);
-
+  console.log("object33");
   return ratings;
 };
 
