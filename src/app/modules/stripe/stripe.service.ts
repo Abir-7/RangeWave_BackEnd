@@ -185,7 +185,7 @@ const createPaymentIntent = async (pId: string) => {
     txId: newPaymentIntent.id,
     paymentType: PaymentType.ONLINE,
   });
-
+  console.log(newPaymentIntent);
   return {
     paymentIntent: newPaymentIntent.client_secret,
   };
