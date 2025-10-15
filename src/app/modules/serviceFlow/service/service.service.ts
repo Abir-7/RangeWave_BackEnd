@@ -579,6 +579,9 @@ export const getMechanicRatings = async (mechanicId: string) => {
         name: "$userProfile.fullName",
       },
     },
+    {
+      $sort: { createdAt: -1 }, // newest first
+    },
   ]);
 
   return ratings;
@@ -611,6 +614,9 @@ const getUserRatings = async (userId: string) => {
         text: 1,
         name: "$mechanicProfile.fullName",
       },
+    },
+    {
+      $sort: { createdAt: -1 }, // newest first
     },
   ]);
 
