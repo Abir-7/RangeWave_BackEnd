@@ -14,5 +14,10 @@ router.get(
   auth("MECHANIC"),
   StripeController.zoneExclusivePayment
 );
+router.get(
+  "/get-express-dashboard-link",
+  auth("MECHANIC"),
+  StripeController.getExpressDashboardLink
+);
 
 export const StripeRoute = router;

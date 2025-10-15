@@ -12,6 +12,7 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 
 import { Bid } from "./bid.model";
 import mongoose from "mongoose";
+import { stripe } from "../../stripe/stripe";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -61,6 +62,24 @@ const addBid = async (
     throw new AppError(status.BAD_REQUEST, "You already add bid.");
   }
 
+  if (mechaniceProfile?.stripeAccountId) {
+    const account = await stripe.accounts.retrieve(
+      mechaniceProfile?.stripeAccountId
+    );
+    const canReceivePayments =
+      account.charges_enabled && account.payouts_enabled;
+
+    if (!canReceivePayments) {
+      throw new AppError(
+        500,
+        "Stripe account not configured correctly. Try again to connect & verify."
+      );
+    }
+  }
+
+  if (!mechaniceProfile?.stripeAccountId) {
+    throw new AppError(500, "You have to add a stripe account from profile.");
+  }
   const saveBid = await Bid.create({
     price: bidData.price,
     reqServiceId: bidData.reqServiceId,

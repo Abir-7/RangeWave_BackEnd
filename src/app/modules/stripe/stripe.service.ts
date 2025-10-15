@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import status from "http-status";
@@ -156,23 +157,29 @@ const createPaymentIntent = async (pId: string) => {
   if (!connectedAccount || (connectedAccount as any).deleted) {
     throw new AppError(status.NOT_FOUND, "Invalid connected account.");
   }
-
-  const newPaymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(totalCost * 100),
-    currency: "usd",
-    customer: stripeCustomerId,
-    automatic_payment_methods: { enabled: true },
-    transfer_data: {
-      destination: mechanicData.stripeAccountId,
-    },
-    metadata: {
-      bidId: String(paymentData.bidId),
-      serviceId: String(paymentData.serviceId),
-      userId: String(paymentData.user),
-      mechanicId: String(paymentData.mechanicId),
-      paymentId: pId,
-    },
-  });
+  let newPaymentIntent;
+  try {
+    newPaymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(totalCost * 100),
+      currency: "usd",
+      customer: stripeCustomerId,
+      automatic_payment_methods: { enabled: true },
+      transfer_data: {
+        destination: mechanicData.stripeAccountId,
+      },
+      metadata: {
+        bidId: String(paymentData.bidId),
+        serviceId: String(paymentData.serviceId),
+        userId: String(paymentData.user),
+        mechanicId: String(paymentData.mechanicId),
+        paymentId: pId,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      "The mechanic hasn’t finished payment setup. You can wait for verification or choose offline."
+    );
+  }
 
   await Payment.findByIdAndUpdate(pId, {
     txId: newPaymentIntent.id,
@@ -280,32 +287,32 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
 
       break;
     }
-    // case "account.updated": {
-    //   console.log("hit");
-    //   const account = event.data.object; // Stripe.Account
-    //   const stripeAccountId = account.id; // e.g. acct_1QWxyzABC
+    case "account.updated": {
+      console.log("hit");
+      const account = event.data.object; // Stripe.Account
+      const stripeAccountId = account.id; // e.g. acct_1QWxyzABC
 
-    //   // Find mechanic by their connected Stripe account
-    //   const mechanicProfile = await MechanicProfile.findOne({
-    //     stripeAccountId,
-    //   });
+      // Find mechanic by their connected Stripe account
+      const mechanicProfile = await MechanicProfile.findOne({
+        stripeAccountId,
+      });
 
-    //   // Check if their account is fully active
-    //   if (account.charges_enabled && account.payouts_enabled) {
-    //     if (mechanicProfile) {
-    //       mechanicProfile.isStripeActive = true;
-    //       await mechanicProfile.save();
-    //     }
-    //   } else {
-    //     // Optional: handle case where account becomes inactive
-    //     if (mechanicProfile) {
-    //       mechanicProfile.isStripeActive = false;
-    //       await mechanicProfile.save();
-    //     }
-    //   }
+      // Check if their account is fully active
+      if (account.charges_enabled && account.payouts_enabled) {
+        if (mechanicProfile) {
+          mechanicProfile.isStripeActive = true;
+          await mechanicProfile.save();
+        }
+      } else {
+        // Optional: handle case where account becomes inactive
+        if (mechanicProfile) {
+          mechanicProfile.isStripeActive = false;
+          await mechanicProfile.save();
+        }
+      }
 
-    //   break;
-    // }
+      break;
+    }
 
     case "payment_intent.payment_failed":
     case "payment_intent.canceled": {
@@ -317,9 +324,34 @@ const stripeWebhook = async (rawBody: Buffer, sig: string) => {
   }
 };
 
+const getExpressDashboardLink = async (mechanic_id: string) => {
+  const profile = await MechanicProfile.findOne({ user: mechanic_id }).lean();
+  console.log(profile);
+  const mechanicStripeAccountId = profile?.stripeAccountId;
+  if (!mechanicStripeAccountId) {
+    throw new Error("You have no stripe account linked");
+  }
+
+  //await stripe.accounts.del(mechanicStripeAccountId);
+
+  // Create a login link
+  try {
+    const loginLink = await stripe.accounts.createLoginLink(
+      mechanicStripeAccountId
+    );
+
+    return loginLink.url;
+  } catch (error) {
+    throw new Error(
+      "Stripe account not configured correctly. Try again to connect."
+    );
+  }
+};
+
 export const StripeService = {
   createAndConnect,
   createPaymentIntent,
   zoneExclusivePayment,
   stripeWebhook,
+  getExpressDashboardLink,
 };

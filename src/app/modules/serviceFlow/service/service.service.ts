@@ -339,7 +339,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
     const coords = bid.mechanicProfile?.workshop?.location?.coordinates;
 
     const distance =
-      coords.length > 1
+      coords?.length > 1
         ? calculateDistance(
             service.location.coordinates.coordinates as [number, number],
             coords
@@ -356,6 +356,7 @@ const getBidListOfService = async (serviceId: string, userId: string) => {
 };
 
 const hireMechanic = async (data: { bidId: string }, userId: string) => {
+  console.log(data.bidId, "ssdasd");
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -650,7 +651,7 @@ const getRunningService = async (userId: string) => {
     .select("-id -__v  -updatedAt ")
     .sort({ updatedAt: -1 });
 
-  if (!payments.length) {
+  if (!payments?.length) {
     return [];
   }
   console.log(payments);
@@ -1051,11 +1052,11 @@ const getAllRequestedService = async (
   const workshopLocation = mechanicData?.workshop?.location?.coordinates
     ?.coordinates as [number, number];
   // Add distance
-  const enriched = data.map((service: any) => ({
+  const enriched = data?.map((service: any) => ({
     ...service,
     distanceKm:
-      workshopLocation.length > 1
-        ? calculateDistance(workshopLocation, service.location.coordinates)
+      workshopLocation?.length > 1
+        ? calculateDistance(workshopLocation, service?.location.coordinates)
         : 0,
   }));
 
@@ -1199,7 +1200,7 @@ const seeServiceDetails = async (sId: string) => {
     },
   ]);
 
-  if (!service || service.length === 0) {
+  if (!service || service?.length === 0) {
     throw new Error("Service not found");
   }
 

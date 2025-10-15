@@ -37,9 +37,19 @@ const zoneExclusivePayment = catchAsync(async (req, res) => {
     data: result,
   });
 });
+const getExpressDashboardLink = catchAsync(async (req, res) => {
+  const result = await StripeService.getExpressDashboardLink(req.user.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: status.OK,
+    message: "Dashboard link created",
+    data: result,
+  });
+});
 
 export const StripeController = {
   createAndConnect,
   stripeWebhook,
   zoneExclusivePayment,
+  getExpressDashboardLink,
 };
