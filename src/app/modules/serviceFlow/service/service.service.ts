@@ -654,7 +654,7 @@ const getRunningService = async (userId: string) => {
   if (!payments?.length) {
     return [];
   }
-  console.log(payments);
+
   return payments;
 };
 
