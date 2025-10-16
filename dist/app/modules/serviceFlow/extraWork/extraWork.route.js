@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ExtraWorkRoute = void 0;
+const express_1 = require("express");
+const auth_1 = require("../../../middleware/auth/auth");
+const extraWork_controller_1 = require("./extraWork.controller");
+const router = (0, express_1.Router)();
+router.post("/req-for-extra-work", (0, auth_1.auth)("MECHANIC"), extraWork_controller_1.ExtraWorkController.reqForExtraWork);
+router.patch("/reject-req-for-extrawork/:pId", (0, auth_1.auth)("USER"), extraWork_controller_1.ExtraWorkController.rejectReqForExtrawork);
+router.patch("/accept-req-for-extrawork/:pId", (0, auth_1.auth)("USER"), extraWork_controller_1.ExtraWorkController.acceptReqForExtrawork);
+exports.ExtraWorkRoute = router;

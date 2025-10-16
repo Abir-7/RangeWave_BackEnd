@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.StripeRoute = void 0;
+const express_1 = require("express");
+const auth_1 = require("../../middleware/auth/auth");
+const stripe_controller_1 = require("./stripe.controller");
+const router = (0, express_1.Router)();
+router.post("/create-and-connect", (0, auth_1.auth)("MECHANIC"), stripe_controller_1.StripeController.createAndConnect);
+router.get("/zone-exclusive", (0, auth_1.auth)("MECHANIC"), stripe_controller_1.StripeController.zoneExclusivePayment);
+router.get("/get-express-dashboard-link", (0, auth_1.auth)("MECHANIC"), stripe_controller_1.StripeController.getExpressDashboardLink);
+exports.StripeRoute = router;
