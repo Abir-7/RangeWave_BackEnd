@@ -76,6 +76,11 @@ router.get(
   auth("MECHANIC", "USER"),
   ServiceController.getRunningService
 );
+router.get(
+  "/get-running-service-single",
+  auth("MECHANIC", "USER"),
+  ServiceController.getRunningServiceSingle
+);
 
 router.get(
   "/see-running-service-progress/:pId",

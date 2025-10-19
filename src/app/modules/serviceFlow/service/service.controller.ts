@@ -107,6 +107,19 @@ const getRunningService = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getRunningServiceSingle = catchAsync(
+  async (req: Request, res: Response) => {
+    const result = await ServiceService.getRunningServiceSingle(
+      req.user.userId
+    );
+    sendResponse(res, {
+      success: true,
+      statusCode: 200,
+      message: "Current Service data is fetched successfully",
+      data: result,
+    });
+  }
+);
 
 const seeCurrentServiceProgress = catchAsync(
   async (req: Request, res: Response) => {
@@ -247,4 +260,6 @@ export const ServiceController = {
   changeServiceStatus,
   markServiceAsComplete,
   mechanicDetails,
+
+  getRunningServiceSingle,
 };

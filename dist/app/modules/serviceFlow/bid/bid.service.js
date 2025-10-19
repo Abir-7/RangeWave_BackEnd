@@ -25,12 +25,23 @@ const mechanicProfile_model_1 = require("../../users/mechanicProfile/mechanicPro
 const bid_model_1 = require("./bid.model");
 const mongoose_1 = __importDefault(require("mongoose"));
 const stripe_1 = require("../../stripe/stripe");
+// import Payment from "../../stripe/payment.model";
+// import { PaymentStatus } from "../../stripe/payment.interface";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 const addBid = (bidData, userId) => __awaiter(void 0, void 0, void 0, function* () {
     const isServiceExist = yield service_model_1.Service.findOne({
         _id: bidData.reqServiceId,
         status: service_interface_1.Status.FINDING,
     });
+    ///-----------------
+    // const isAnyRunning = await Payment.findOne({
+    //   mechanicId: userId,
+    //   status: PaymentStatus.UNPAID,
+    // }).lean();
+    // if (isAnyRunning && isAnyRunning?._id) {
+    //   throw new AppError(status.BAD_REQUEST, "Your current service not done.");
+    // }
+    ///-----------------
     const mechaniceProfile = yield mechanicProfile_model_1.MechanicProfile.findOne({ user: userId });
     if (!mechaniceProfile) {
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Profile or stripe account id not found.");

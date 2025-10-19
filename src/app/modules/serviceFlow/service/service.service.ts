@@ -667,8 +667,43 @@ const getRunningService = async (userId: string) => {
   if (!payments?.length) {
     return [];
   }
-
   return payments;
+};
+
+const getRunningServiceSingle = async (userId: string) => {
+  const userData = await User.findById(userId).lean();
+  if (!userData) {
+    throw new AppError(status.NOT_FOUND, "User not found.");
+  }
+
+  let filter: any = {};
+  if (userData.role === "USER") {
+    filter = { status: PaymentStatus.UNPAID, user: userId }; //
+  } else if (userData.role === "MECHANIC") {
+    filter = { status: PaymentStatus.UNPAID, mechanicId: userId };
+  } else {
+    throw new AppError(status.BAD_REQUEST, "Invalid user role.");
+  }
+
+  const payments = await Payment.findOne(filter)
+    .select(" -__v ")
+    .sort({ updatedAt: -1 })
+    .limit(1);
+
+  const data: { pId: string | null; sId?: string | null } = {
+    pId: payments?._id.toString() || null,
+  };
+
+  if (userData.role === "USER") {
+    const service = await Service.findOne({
+      status: Status.FINDING,
+      user: userId,
+    }).sort({ updatedAt: -1 });
+
+    data.sId = service?._id.toString() || null;
+  }
+
+  return data;
 };
 
 const cancelService = async (
@@ -732,6 +767,7 @@ const cancelService = async (
     throw error;
   }
 };
+
 const seeCurrentServiceProgress = async (
   pId: string,
   userRoleData: TUserRole
@@ -1414,6 +1450,7 @@ export const ServiceService = {
   changeServiceStatus,
   markServiceAsComplete,
   getUserRatings,
+  getRunningServiceSingle,
 };
 
 //helper function

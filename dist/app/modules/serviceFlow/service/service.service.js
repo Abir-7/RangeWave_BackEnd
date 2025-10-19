@@ -593,6 +593,37 @@ const getRunningService = (userId) => __awaiter(void 0, void 0, void 0, function
     }
     return payments;
 });
+const getRunningServiceSingle = (userId) => __awaiter(void 0, void 0, void 0, function* () {
+    const userData = yield user_model_1.default.findById(userId).lean();
+    if (!userData) {
+        throw new AppError_1.default(http_status_1.status.NOT_FOUND, "User not found.");
+    }
+    let filter = {};
+    if (userData.role === "USER") {
+        filter = { status: payment_interface_1.PaymentStatus.UNPAID, user: userId }; //
+    }
+    else if (userData.role === "MECHANIC") {
+        filter = { status: payment_interface_1.PaymentStatus.UNPAID, mechanicId: userId };
+    }
+    else {
+        throw new AppError_1.default(http_status_1.status.BAD_REQUEST, "Invalid user role.");
+    }
+    const payments = yield payment_model_1.default.findOne(filter)
+        .select(" -__v ")
+        .sort({ updatedAt: -1 })
+        .limit(1);
+    const data = {
+        pId: (payments === null || payments === void 0 ? void 0 : payments._id.toString()) || null,
+    };
+    if (userData.role === "USER") {
+        const service = yield service_model_1.Service.findOne({
+            status: service_interface_1.Status.FINDING,
+            user: userId,
+        }).sort({ updatedAt: -1 });
+        data.sId = (service === null || service === void 0 ? void 0 : service._id.toString()) || null;
+    }
+    return data;
+});
 const cancelService = (pId, serviceData, userId, userRoleDAta) => __awaiter(void 0, void 0, void 0, function* () {
     const session = yield mongoose_1.default.startSession();
     console.log(pId, "ssss", userId);
@@ -1214,6 +1245,7 @@ exports.ServiceService = {
     changeServiceStatus,
     markServiceAsComplete,
     getUserRatings,
+    getRunningServiceSingle,
 };
 //helper function
 const calculateDistance = (coords1, coords2) => {

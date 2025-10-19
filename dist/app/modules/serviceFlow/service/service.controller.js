@@ -95,6 +95,15 @@ const getRunningService = (0, catchAsync_1.default)((req, res) => __awaiter(void
         data: result,
     });
 }));
+const getRunningServiceSingle = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield service_service_1.ServiceService.getRunningServiceSingle(req.user.userId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: 200,
+        message: "Current Service data is fetched successfully",
+        data: result,
+    });
+}));
 const seeCurrentServiceProgress = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield service_service_1.ServiceService.seeCurrentServiceProgress(req.params.pId, req.user.userRole);
     (0, sendResponse_1.default)(res, {
@@ -193,4 +202,5 @@ exports.ServiceController = {
     changeServiceStatus,
     markServiceAsComplete,
     mechanicDetails,
+    getRunningServiceSingle,
 };

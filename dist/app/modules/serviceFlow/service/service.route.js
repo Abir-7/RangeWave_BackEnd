@@ -25,6 +25,7 @@ router.get("/see-details/:sId", (0, auth_1.auth)("MECHANIC"), service_controller
 router.patch("/change-service-status/:pId", (0, auth_1.auth)("MECHANIC"), service_controller_1.ServiceController.changeServiceStatus);
 //--------------------------------------for both-------------------------------
 router.get("/get-running-service", (0, auth_1.auth)("MECHANIC", "USER"), service_controller_1.ServiceController.getRunningService);
+router.get("/get-running-service-single", (0, auth_1.auth)("MECHANIC", "USER"), service_controller_1.ServiceController.getRunningServiceSingle);
 router.get("/see-running-service-progress/:pId", (0, auth_1.auth)("MECHANIC", "USER"), service_controller_1.ServiceController.seeCurrentServiceProgress);
 router.patch("/cencel-service/:pId", (0, auth_1.auth)("USER", "MECHANIC"), service_controller_1.ServiceController.cancelService);
 //-----------------------------------------------SOCKET----------------------------------------------------------

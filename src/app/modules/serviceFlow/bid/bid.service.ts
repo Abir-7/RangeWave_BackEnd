@@ -13,6 +13,8 @@ import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.mod
 import { Bid } from "./bid.model";
 import mongoose from "mongoose";
 import { stripe } from "../../stripe/stripe";
+// import Payment from "../../stripe/payment.model";
+// import { PaymentStatus } from "../../stripe/payment.interface";
 //import { MechanicProfile } from "../../users/mechanicProfile/mechanicProfile.model";
 
 const addBid = async (
@@ -28,7 +30,16 @@ const addBid = async (
     _id: bidData.reqServiceId,
     status: Status.FINDING,
   });
+  ///-----------------
+  // const isAnyRunning = await Payment.findOne({
+  //   mechanicId: userId,
+  //   status: PaymentStatus.UNPAID,
+  // }).lean();
 
+  // if (isAnyRunning && isAnyRunning?._id) {
+  //   throw new AppError(status.BAD_REQUEST, "Your current service not done.");
+  // }
+  ///-----------------
   const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
 
   if (!mechaniceProfile) {
