@@ -43,10 +43,7 @@ const addBid = async (
   const mechaniceProfile = await MechanicProfile.findOne({ user: userId });
 
   if (!mechaniceProfile) {
-    throw new AppError(
-      status.NOT_FOUND,
-      "Profile or stripe account id not found."
-    );
+    throw new AppError(status.NOT_FOUND, "Profile not found.");
   }
 
   if (mechaniceProfile.isNeedToPayForWorkShop) {
@@ -82,7 +79,7 @@ const addBid = async (
 
     if (!canReceivePayments) {
       throw new AppError(
-        500,
+        status.BAD_REQUEST,
         "Stripe account not configured correctly. Try again to connect & verify."
       );
     }
