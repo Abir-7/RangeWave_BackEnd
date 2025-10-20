@@ -44,7 +44,7 @@ const addBid = (bidData, userId) => __awaiter(void 0, void 0, void 0, function* 
     ///-----------------
     const mechaniceProfile = yield mechanicProfile_model_1.MechanicProfile.findOne({ user: userId });
     if (!mechaniceProfile) {
-        throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Profile or stripe account id not found.");
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, "Profile not found.");
     }
     if (mechaniceProfile.isNeedToPayForWorkShop) {
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Another mechanics with workshop open account before you near your location. So you have to pay for one time.After pay you can bid.");
@@ -66,7 +66,7 @@ const addBid = (bidData, userId) => __awaiter(void 0, void 0, void 0, function* 
         const account = yield stripe_1.stripe.accounts.retrieve(mechaniceProfile === null || mechaniceProfile === void 0 ? void 0 : mechaniceProfile.stripeAccountId);
         const canReceivePayments = account.charges_enabled && account.payouts_enabled;
         if (!canReceivePayments) {
-            throw new AppError_1.default(500, "Stripe account not configured correctly. Try again to connect & verify.");
+            throw new AppError_1.default(http_status_1.default.BAD_REQUEST, "Stripe account not configured correctly. Try again to connect & verify.");
         }
     }
     if (!(mechaniceProfile === null || mechaniceProfile === void 0 ? void 0 : mechaniceProfile.stripeAccountId)) {
