@@ -6,6 +6,7 @@ import logger from "../utils/logger";
 import { MessageService } from "../modules/chat/message/message.service";
 import Payment from "../modules/stripe/payment.model";
 import { Status } from "../modules/serviceFlow/service/service.interface";
+import { Service } from "../modules/serviceFlow/service/service.model";
 
 interface User {
   userId: string; // some unique user identifier from your auth system
@@ -100,6 +101,18 @@ export const initSocket = async (httpServer: HttpServer) => {
         };
 
         io?.emit(`user-${paymentData.user}`, socketData);
+      }
+    );
+
+    socket.on(
+      "new-bid",
+      async (data: { serviceId: string; status: Status }) => {
+        const service_data = await Service.findById(data.serviceId).lean();
+
+        io?.emit(`user-service-${service_data?.user}`, {
+          serviceId: service_data?._id,
+          mechanic: "A mechanic bid on your service",
+        });
       }
     );
 

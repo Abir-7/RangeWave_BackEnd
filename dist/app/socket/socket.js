@@ -18,6 +18,7 @@ const logger_1 = __importDefault(require("../utils/logger"));
 const message_service_1 = require("../modules/chat/message/message.service");
 const payment_model_1 = __importDefault(require("../modules/stripe/payment.model"));
 const service_interface_1 = require("../modules/serviceFlow/service/service.interface");
+const service_model_1 = require("../modules/serviceFlow/service/service.model");
 const connectedUsers = new Map();
 exports.io = null;
 const initSocket = (httpServer) => __awaiter(void 0, void 0, void 0, function* () {
@@ -76,6 +77,13 @@ const initSocket = (httpServer) => __awaiter(void 0, void 0, void 0, function* (
             const socketData = Object.assign(Object.assign({}, data), { message: statusMessages[data.status] ||
                     `Service status changed to ${data.status}` });
             exports.io === null || exports.io === void 0 ? void 0 : exports.io.emit(`user-${paymentData.user}`, socketData);
+        }));
+        socket.on("new-bid", (data) => __awaiter(void 0, void 0, void 0, function* () {
+            const service_data = yield service_model_1.Service.findById(data.serviceId).lean();
+            exports.io === null || exports.io === void 0 ? void 0 : exports.io.emit(`user-service-${service_data === null || service_data === void 0 ? void 0 : service_data.user}`, {
+                serviceId: service_data === null || service_data === void 0 ? void 0 : service_data._id,
+                mechanic: "A mechanic bid on your service",
+            });
         }));
         socket.on("disconnect", () => {
             logger_1.default.info(`Client disconnected: ${socket.id}`);
