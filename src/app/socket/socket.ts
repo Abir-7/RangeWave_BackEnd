@@ -104,17 +104,15 @@ export const initSocket = async (httpServer: HttpServer) => {
       }
     );
 
-    socket.on(
-      "new-bid",
-      async (data: { serviceId: string; status: Status }) => {
-        const service_data = await Service.findById(data.serviceId).lean();
+    socket.on("new-bid", async (data: { serviceId: string }) => {
+      const service_data = await Service.findById(data.serviceId).lean();
 
-        io?.emit(`user-service-${service_data?.user}`, {
-          serviceId: service_data?._id,
-          mechanic: "A mechanic bid on your service",
-        });
-      }
-    );
+      io?.emit(`user-service-${service_data?.user}`, {
+        serviceId: service_data?._id,
+        mechanic: "A mechanic bid on your service",
+        issue: service_data?.issue,
+      });
+    });
 
     socket.on("disconnect", () => {
       logger.info(`Client disconnected: ${socket.id}`);

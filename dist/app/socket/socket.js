@@ -83,6 +83,7 @@ const initSocket = (httpServer) => __awaiter(void 0, void 0, void 0, function* (
             exports.io === null || exports.io === void 0 ? void 0 : exports.io.emit(`user-service-${service_data === null || service_data === void 0 ? void 0 : service_data.user}`, {
                 serviceId: service_data === null || service_data === void 0 ? void 0 : service_data._id,
                 mechanic: "A mechanic bid on your service",
+                issue: service_data === null || service_data === void 0 ? void 0 : service_data.issue,
             });
         }));
         socket.on("disconnect", () => {
